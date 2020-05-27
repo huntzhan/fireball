@@ -24,6 +24,7 @@ tests = ["coverage", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.i
 [[package]]
 category = "dev"
 description = "An easy safelist-based HTML-sanitizing tool."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "bleach"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
@@ -37,6 +38,7 @@ webencodings = "*"
 [[package]]
 category = "dev"
 description = "Python package for providing Mozilla's CA Bundle."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "certifi"
 optional = false
 python-versions = "*"
@@ -45,7 +47,7 @@ version = "2020.4.5.1"
 [[package]]
 category = "dev"
 description = "Foreign Function Interface for Python calling C code."
-marker = "sys_platform == \"linux\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"linux\""
 name = "cffi"
 optional = false
 python-versions = "*"
@@ -57,6 +59,7 @@ pycparser = "*"
 [[package]]
 category = "dev"
 description = "Universal encoding detector for Python 2 and 3"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "chardet"
 optional = false
 python-versions = "*"
@@ -74,7 +77,7 @@ version = "0.4.3"
 [[package]]
 category = "dev"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
-marker = "sys_platform == \"linux\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"linux\""
 name = "cryptography"
 optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
@@ -94,6 +97,7 @@ test = ["pytest (>=3.6.0,<3.9.0 || >3.9.0,<3.9.1 || >3.9.1,<3.9.2 || >3.9.2)", "
 [[package]]
 category = "dev"
 description = "Docutils -- Python Documentation Utilities"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "docutils"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
@@ -114,6 +118,7 @@ termcolor = "*"
 [[package]]
 category = "dev"
 description = "the modular source code checker: pep8 pyflakes and co"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "flake8"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
@@ -124,9 +129,14 @@ mccabe = ">=0.6.0,<0.7.0"
 pycodestyle = ">=2.6.0a1,<2.7.0"
 pyflakes = ">=2.2.0,<2.3.0"
 
+[package.dependencies.importlib-metadata]
+python = "<3.8"
+version = "*"
+
 [[package]]
 category = "dev"
 description = "Internationalized Domain Names in Applications (IDNA)"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "idna"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
@@ -134,8 +144,24 @@ version = "2.9"
 
 [[package]]
 category = "dev"
+description = "Read metadata from Python packages"
+marker = "python_version >= \"3.6\" and python_version < \"3.8\" or python_version < \"3.8\""
+name = "importlib-metadata"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
+version = "1.6.0"
+
+[package.dependencies]
+zipp = ">=0.5"
+
+[package.extras]
+docs = ["sphinx", "rst.linker"]
+testing = ["packaging", "importlib-resources"]
+
+[[package]]
+category = "dev"
 description = "Low-level, pure Python DBus protocol wrapper."
-marker = "sys_platform == \"linux\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"linux\""
 name = "jeepney"
 optional = false
 python-versions = ">=3.5"
@@ -147,6 +173,7 @@ dev = ["testpath"]
 [[package]]
 category = "dev"
 description = "Store and access your passwords safely."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "keyring"
 optional = false
 python-versions = ">=3.6"
@@ -157,6 +184,10 @@ SecretStorage = ">=3"
 jeepney = ">=0.4.2"
 pywin32-ctypes = "<0.1.0 || >0.1.0,<0.1.1 || >0.1.1"
 
+[package.dependencies.importlib-metadata]
+python = "<3.8"
+version = "*"
+
 [package.extras]
 docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pytest-black (>=0.3.7)", "pytest-cov"]
@@ -164,6 +195,7 @@ testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pyt
 [[package]]
 category = "dev"
 description = "McCabe checker, plugin for flake8"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "mccabe"
 optional = false
 python-versions = "*"
@@ -191,7 +223,20 @@ six = "*"
 
 [[package]]
 category = "dev"
+description = "Object-oriented filesystem paths"
+marker = "python_version < \"3.6\""
+name = "pathlib2"
+optional = false
+python-versions = "*"
+version = "2.3.5"
+
+[package.dependencies]
+six = "*"
+
+[[package]]
+category = "dev"
 description = "Query metadatdata from sdists / bdists / installed packages."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "pkginfo"
 optional = false
 python-versions = "*"
@@ -208,6 +253,11 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 version = "0.13.1"
 
+[package.dependencies]
+[package.dependencies.importlib-metadata]
+python = "<3.8"
+version = ">=0.12"
+
 [package.extras]
 dev = ["pre-commit", "tox"]
 
@@ -222,6 +272,7 @@ version = "1.8.1"
 [[package]]
 category = "dev"
 description = "Python style guide checker"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "pycodestyle"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
@@ -230,7 +281,7 @@ version = "2.6.0"
 [[package]]
 category = "dev"
 description = "C parser in Python"
-marker = "sys_platform == \"linux\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"linux\""
 name = "pycparser"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
@@ -239,6 +290,7 @@ version = "2.20"
 [[package]]
 category = "dev"
 description = "passive checker of Python programs"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "pyflakes"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
@@ -247,6 +299,7 @@ version = "2.2.0"
 [[package]]
 category = "dev"
 description = "Pygments is a syntax highlighting package written in Python."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "pygments"
 optional = false
 python-versions = ">=3.5"
@@ -278,6 +331,14 @@ pluggy = ">=0.12,<1.0"
 py = ">=1.5.0"
 wcwidth = "*"
 
+[package.dependencies.importlib-metadata]
+python = "<3.8"
+version = ">=0.12"
+
+[package.dependencies.pathlib2]
+python = "<3.6"
+version = ">=2.2.0"
+
 [package.extras]
 checkqa-mypy = ["mypy (v0.761)"]
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
@@ -285,7 +346,7 @@ testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xm
 [[package]]
 category = "dev"
 description = ""
-marker = "sys_platform == \"win32\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"win32\""
 name = "pywin32-ctypes"
 optional = false
 python-versions = "*"
@@ -294,6 +355,7 @@ version = "0.2.0"
 [[package]]
 category = "dev"
 description = "readme_renderer is a library for rendering \"readme\" descriptions for Warehouse"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "readme-renderer"
 optional = false
 python-versions = "*"
@@ -311,6 +373,7 @@ md = ["cmarkgfm (>=0.2.0)"]
 [[package]]
 category = "dev"
 description = "Python HTTP for Humans."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "requests"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
@@ -329,6 +392,7 @@ socks = ["PySocks (>=1.5.6,<1.5.7 || >1.5.7)", "win-inet-pton"]
 [[package]]
 category = "dev"
 description = "A utility belt for advanced users of python-requests"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "requests-toolbelt"
 optional = false
 python-versions = "*"
@@ -340,7 +404,7 @@ requests = ">=2.0.1,<3.0.0"
 [[package]]
 category = "dev"
 description = "Python bindings to FreeDesktop.org Secret Service API"
-marker = "sys_platform == \"linux\""
+marker = "python_version >= \"3.6\" and python_version < \"4.0\" and sys_platform == \"linux\""
 name = "secretstorage"
 optional = false
 python-versions = ">=3.5"
@@ -369,6 +433,7 @@ version = "1.1.0"
 [[package]]
 category = "dev"
 description = "Fast, Extensible Progress Meter"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "tqdm"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*"
@@ -380,6 +445,7 @@ dev = ["py-make (>=0.1.0)", "twine", "argopt", "pydoc-markdown"]
 [[package]]
 category = "dev"
 description = "Collection of utilities for publishing packages on PyPI"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "twine"
 optional = false
 python-versions = ">=3.6"
@@ -394,9 +460,14 @@ requests-toolbelt = ">=0.8.0,<0.9.0 || >0.9.0"
 setuptools = ">=0.7.0"
 tqdm = ">=4.14"
 
+[package.dependencies.importlib-metadata]
+python = "<3.8"
+version = "*"
+
 [[package]]
 category = "dev"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "urllib3"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
@@ -418,6 +489,7 @@ version = "0.1.9"
 [[package]]
 category = "dev"
 description = "Character encoding aliases for legacy web content"
+marker = "python_version >= \"3.6\" and python_version < \"4.0\""
 name = "webencodings"
 optional = false
 python-versions = "*"
@@ -431,9 +503,22 @@ optional = false
 python-versions = "*"
 version = "0.30.0"
 
+[[package]]
+category = "dev"
+description = "Backport of pathlib-compatible object wrapper for zip files"
+marker = "python_version >= \"3.6\" and python_version < \"3.8\" or python_version < \"3.8\""
+name = "zipp"
+optional = false
+python-versions = ">=2.7"
+version = "1.2.0"
+
+[package.extras]
+docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
+testing = ["pathlib2", "unittest2", "jaraco.itertools", "func-timeout"]
+
 [metadata]
-content-hash = "c40af3d2f39cd91e4b6d781637a5c74b6c010d51cf889a917ea6fe60d7a862e1"
-python-versions = "^3.8"
+content-hash = "ca4e2d07e0b97169522af350fdfcd6e415d46a68f926822d011d71ef2a7b61ca"
+python-versions = "^3.5"
 
 [metadata.files]
 atomicwrites = [
@@ -526,6 +611,10 @@ idna = [
     {file = "idna-2.9-py2.py3-none-any.whl", hash = "sha256:a068a21ceac8a4d63dbfd964670474107f541babbd2250d61922f029858365fa"},
     {file = "idna-2.9.tar.gz", hash = "sha256:7588d1c14ae4c77d74036e8c22ff447b26d0fde8f007354fd48a7814db15b7cb"},
 ]
+importlib-metadata = [
+    {file = "importlib_metadata-1.6.0-py2.py3-none-any.whl", hash = "sha256:2a688cbaa90e0cc587f1df48bdc97a6eadccdcd9c35fb3f976a09e3b5016d90f"},
+    {file = "importlib_metadata-1.6.0.tar.gz", hash = "sha256:34513a8a0c4962bc66d35b359558fd8a5e10cd472d37aec5f66858addef32c1e"},
+]
 jeepney = [
     {file = "jeepney-0.4.3-py3-none-any.whl", hash = "sha256:d6c6b49683446d2407d2fe3acb7a368a77ff063f9182fe427da15d622adc24cf"},
     {file = "jeepney-0.4.3.tar.gz", hash = "sha256:3479b861cc2b6407de5188695fa1a8d57e5072d7059322469b62628869b8e36e"},
@@ -545,6 +634,10 @@ more-itertools = [
 packaging = [
     {file = "packaging-20.4-py2.py3-none-any.whl", hash = "sha256:998416ba6962ae7fbd6596850b80e17859a5753ba17c32284f67bfff33784181"},
     {file = "packaging-20.4.tar.gz", hash = "sha256:4357f74f47b9c12db93624a82154e9b120fa8293699949152b22065d556079f8"},
+]
+pathlib2 = [
+    {file = "pathlib2-2.3.5-py2.py3-none-any.whl", hash = "sha256:0ec8205a157c80d7acc301c0b18fbd5d44fe655968f5d947b6ecef5290fc35db"},
+    {file = "pathlib2-2.3.5.tar.gz", hash = "sha256:6cd9a47b597b37cc57de1c05e56fb1a1c9cc9fab04fe78c29acd090418529868"},
 ]
 pkginfo = [
     {file = "pkginfo-1.5.0.1-py2.py3-none-any.whl", hash = "sha256:a6d9e40ca61ad3ebd0b72fbadd4fba16e4c0e4df0428c041e01e06eb6ee71f32"},
@@ -632,4 +725,8 @@ webencodings = [
 yapf = [
     {file = "yapf-0.30.0-py2.py3-none-any.whl", hash = "sha256:3abf61ba67cf603069710d30acbc88cfe565d907e16ad81429ae90ce9651e0c9"},
     {file = "yapf-0.30.0.tar.gz", hash = "sha256:3000abee4c28daebad55da6c85f3cd07b8062ce48e2e9943c8da1b9667d48427"},
+]
+zipp = [
+    {file = "zipp-1.2.0-py2.py3-none-any.whl", hash = "sha256:e0d9e63797e483a30d27e09fffd308c59a700d365ec34e93cc100844168bf921"},
+    {file = "zipp-1.2.0.tar.gz", hash = "sha256:c70410551488251b0fee67b460fb9a536af8d6f9f008ad10ac51f615b6a521b1"},
 ]
