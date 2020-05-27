@@ -34,7 +34,7 @@ def take_over_excepthook(option, excepthook):
         sys.excepthook = excepthook
 
 
-def cli(func):
+def cli_with_debug(func):
     sig_func = inspect.signature(func)
 
     PARAM_PDB_ON_ERROR = 'pdb_on_error'
@@ -73,3 +73,10 @@ def cli(func):
 
     # Bind to python-fire.
     return lambda: fire.Fire(wrapper)
+
+
+def cli(func, debug=False):
+    if debug:
+        return cli_with_debug(func)
+    else:
+        return lambda: fire.Fire(func)
