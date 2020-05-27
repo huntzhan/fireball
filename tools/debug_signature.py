@@ -21,7 +21,6 @@ def baz(*arg, pdb=False, **kwargs):
 
 print(functools.WRAPPER_UPDATES)
 
-
 print(inspect.signature(foo))
 print(inspect.signature(bar))
 
@@ -32,7 +31,9 @@ print(sig.parameters['c'].kind)
 print(sig.parameters['c'].empty)
 print(sig.parameters['c'].default)
 parameters = list(sig.parameters.values())
-parameters.append(inspect.Parameter(name='pdb', default=False, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
+parameters.append(
+    inspect.Parameter(name='pdb', default=False, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
+)
 
 new_sig = sig.replace(parameters=parameters)
 baz.__signature__ = new_sig

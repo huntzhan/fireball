@@ -19,6 +19,7 @@ exclude =
     dist/**
     data/**
     doc/**
+    tools/**
 
 per-file-ignores =
     # __init__.py files are allowed to have unused imports and lines-too-long
