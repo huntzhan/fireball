@@ -3,6 +3,9 @@ import inspect
 import sys
 import traceback
 import pdb
+import importlib
+import importlib.util
+import os
 
 import fire
 
@@ -16,25 +19,27 @@ def take_over_excepthook(option, excepthook):
     good = True
 
     if hasattr(sys, 'ps1'):
-        sys.stderr.write(
+        print(
             f'[fireball] {option}: Cannot take-over sys.excepthook '
-            'since we are in iterative mode.\n'
+            'since we are in iterative mode.',
+            file=sys.stderr,
         )
         good = False
 
     if not sys.stderr.isatty():
-        sys.stderr.write(
+        print(
             f'[fireball] {option}: Cannot take-over sys.excepthook '
-            'since we don\'t have a tty-like device.\n'
+            'since we don\'t have a tty-like device.',
+            file=sys.stderr,
         )
         good = False
 
     if good:
-        sys.stdout.write(f'[fireball] {option}: Setup successfully.\n')
+        print(f'[fireball] {option}: Setup successfully.')
         sys.excepthook = excepthook
 
 
-def cli_with_debug(func):
+def bind_filre_debug(func):
     sig_func = inspect.signature(func)
 
     PARAM_PDB_ON_ERROR = 'pdb_on_error'
@@ -75,8 +80,56 @@ def cli_with_debug(func):
     return lambda: fire.Fire(wrapper)
 
 
+def bind_filre_release(func):
+    return lambda: fire.Fire(func)
+
+
 def cli(func, debug=False):
     if debug:
-        return cli_with_debug(func)
+        return bind_filre_debug(func)
     else:
-        return lambda: fire.Fire(func)
+        return bind_filre_release(func)
+
+
+def exec():
+    if len(sys.argv) < 2:
+        print('fireball <func_path>', file=sys.stderr)
+        sys.exit(1)
+
+    # Input.
+    func_path = sys.argv[1]
+
+    if ':' not in func_path:
+        print('func_path: should have format like foo.bar:baz.', file=sys.stderr)
+        sys.exit(1)
+
+    module_path, func_name = func_path.strip().split(':')
+    if not module_path:
+        print('Missing module_path.', file=sys.stderr)
+        sys.exit(1)
+    if not func_name:
+        print('Missing func_name.', file=sys.stderr)
+        sys.exit(1)
+
+    # Add the current working directory to sys.path for non-package import.
+    cwd_path = os.getcwd()
+    if cwd_path not in sys.path:
+        sys.path.append(cwd_path)
+
+    # Load module.
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError:
+        print(f'importlib.import_module cannot find module {module_path}.', file=sys.stderr)
+        sys.exit(1)
+
+    # Load function.
+    func = getattr(module, func_name)
+    if func is None:
+        print(f'Cannot find function {func_name}.', file=sys.stderr)
+        sys.exit(1)
+
+    # Call function.
+    func_cli = cli(func, debug=True)
+    sys.argv = [func.__name__] + sys.argv[2:]
+    return func_cli()
