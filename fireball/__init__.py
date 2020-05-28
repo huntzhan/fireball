@@ -39,7 +39,25 @@ def take_over_excepthook(option, excepthook):
         sys.excepthook = excepthook
 
 
-def bind_filre_debug(func):
+def inject_param(parameters, var_positional_idx, var_keyword_idx, name, default):
+    if var_positional_idx < 0:
+        kind = inspect.Parameter.POSITIONAL_OR_KEYWORD
+    else:
+        kind = inspect.Parameter.KEYWORD_ONLY
+
+    if var_keyword_idx < 0:
+        insert_idx = len(parameters)
+    else:
+        insert_idx = var_keyword_idx
+
+    parameters.insert(insert_idx, inspect.Parameter(
+        name=name,
+        default=default,
+        kind=kind,
+    ))
+
+
+def bind_fire_debug(func):
     sig_func = inspect.signature(func)
 
     PARAM_PDB_ON_ERROR = 'pdb_on_error'
@@ -48,6 +66,7 @@ def bind_filre_debug(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         bound_args = wrapper.__signature__.bind(*args, **kwargs)
+        bound_args.apply_defaults()
 
         # Pop injected parameters.
         pdb_on_error = False
@@ -58,37 +77,48 @@ def bind_filre_debug(func):
         if pdb_on_error:
             take_over_excepthook(PARAM_PDB_ON_ERROR, pdb_excepthook)
 
-        return func(**bound_args.arguments)
+        # python-fire will write this to stdout/stderr.
+        return func(*bound_args.args, **bound_args.kwargs)
 
     # Patch signature.
     sig_wrapper = inspect.signature(wrapper)
-    new_parameters = list(sig_wrapper.parameters.values())
+    parameters = list(sig_wrapper.parameters.values())
+
+    var_positional_idx = -1
+    var_keyword_idx = -1
+    for param_idx, param in enumerate(parameters):
+        if param.kind == inspect.Parameter.VAR_POSITIONAL:
+            assert var_positional_idx == -1
+            var_positional_idx = param_idx
+        elif param.kind == inspect.Parameter.VAR_KEYWORD:
+            assert var_keyword_idx == -1
+            var_keyword_idx = param_idx
 
     if not func_contains_param_pdb_on_error:
-        new_parameters.append(
-            inspect.Parameter(
-                name=PARAM_PDB_ON_ERROR,
-                default=False,
-                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            )
+        inject_param(
+            parameters,
+            var_positional_idx,
+            var_keyword_idx,
+            PARAM_PDB_ON_ERROR,
+            False,
         )
 
-    new_sig_wrapper = sig_wrapper.replace(parameters=new_parameters)
+    new_sig_wrapper = sig_wrapper.replace(parameters=parameters)
     wrapper.__signature__ = new_sig_wrapper
 
     # Bind to python-fire.
     return lambda: fire.Fire(wrapper)
 
 
-def bind_filre_release(func):
+def bind_fire_release(func):
     return lambda: fire.Fire(func)
 
 
 def cli(func, debug=False):
     if debug:
-        return bind_filre_debug(func)
+        return bind_fire_debug(func)
     else:
-        return bind_filre_release(func)
+        return bind_fire_release(func)
 
 
 def exec():
@@ -132,4 +162,4 @@ def exec():
     # Call function.
     func_cli = cli(func, debug=True)
     sys.argv = [func.__name__] + sys.argv[2:]
-    return func_cli()
+    func_cli()
