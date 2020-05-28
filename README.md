@@ -10,7 +10,7 @@ pip install fireball
 
 ## Usage
 
-###Invoke Python Function In Command Line
+### Invoke Python Function In Command Line
 
 Basic usage:
 
@@ -146,7 +146,7 @@ FLAGS
 
 NOTES
     You can also use flags syntax for POSITIONAL ARGUMENTS
-    
+
 $ foo_cli this_is_a this_is_b
 foo this_is_a this_is_b
 Traceback (most recent call last):
