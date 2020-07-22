@@ -22,7 +22,7 @@ $ fireball os.path:join 'foo' 'bar'
 foo/bar
 
 $ fireball base64:b64encode 'b"foo"'
-b'Zm9v
+b'Zm9v'
 ```
 
 Help doc:
@@ -104,13 +104,12 @@ def foo(a, b=2):
     print('foo', a, b)
     assert 0
 
-# `debug=True` injects an extra option `--pdb_on_error` to `foo`.
-foo_cli = fireball.cli(foo, debug=True)
+foo_cli = fireball.cli(foo)
 ```
 
 Bind as entry point:
 
-```
+```toml
 # pyproject.toml.
 [tool.poetry.scripts]
 foo = "path.to.app:foo_cli"
@@ -197,4 +196,3 @@ AssertionError
    3  ->     assert 0
 (Pdb++)
 ```
-
