@@ -197,7 +197,8 @@ def exec():
     try:
         module = importlib.import_module(module_path)
     except ModuleNotFoundError:
-        logger.error('importlib.import_module cannot find module %s.', module_path)
+        logger.error('importlib.import_module cannot find or load module %s.', module_path)
+        logger.error(traceback.format_exc())
         sys.exit(1)
 
     # Load function.
