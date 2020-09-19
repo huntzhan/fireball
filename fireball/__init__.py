@@ -48,9 +48,9 @@ def fireball_meta_show_params(arguments_copy, break_limit=79, indent=2):
     for key, val in arguments_copy.items():
         if isinstance(val, bool):
             if val:
-                components.append(f"--{key}")
+                components.append(f'--{key}')
         else:
-            components.append(f"--{key}='{val}'")
+            components.append(f'--{key}="{val}"')
 
     header = 'Show parameters:\n'
     one_line = ' '.join(components)

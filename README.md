@@ -15,20 +15,24 @@ pip install fireball
 Basic usage:
 
 ```bash
-$ fireball os:getcwd
+❯ fireball os:getcwd
 /Users/huntzhan/Data/Project/personal/fireball
 
-$ fireball os.path:join 'foo' 'bar'
-foo/bar
+❯ fireball base64:b64encode 'b"foo"'
+b'Zm9v'
 
-$ fireball base64:b64encode 'b"foo"'
+❯ fireball base64:b64encode 'b"foo"' --show_params_
+Show parameters:
+
+fireball base64:b64encode --s="b'foo'" --altchars="None" --show_params_
+
 b'Zm9v'
 ```
 
 Help doc:
 
 ```bash
-$ fireball base64:b64encode -- --help
+❯ fireball base64:b64encode -- --help
 NAME
     b64encode - Encode the bytes-like object s using Base64 and return a bytes object.
 
@@ -45,16 +49,34 @@ POSITIONAL ARGUMENTS
 
 FLAGS
     --altchars=ALTCHARS
-    --pdb_on_error=PDB_ON_ERROR
+    --pdb_=PDB_
+    --show_params_=SHOW_PARAMS_
+    --show_params_mtl_=SHOW_PARAMS_MTL_
 
 NOTES
     You can also use flags syntax for POSITIONAL ARGUMENTS
 ```
 
+Show the template of parameters:
+
+```bash
+❯ fireball base64:b64encode --show_params_tpl_
+Show parameters:
+
+fireball base64:b64encode --s="<required>" --altchars="None"
+
+❯ fireball base64:b64encode --show_params_tpl_mtl_
+Show parameters:
+
+fireball base64:b64encode \
+  --s="<required>" \
+  --altchars="None"
+```
+
 PDB post-morden:
 
 ```bash
-$ fireball base64:b64encode 'test' --pdb_on_error
+❯ fireball base64:b64encode 'test' --pdb_
 ERROR:root:Traceback (most recent call last):
   File "/Users/huntzhan/.pyenv/versions/fireball/bin/fireball", line 6, in <module>
     sys.exit(import_module('fireball').exec())
@@ -92,7 +114,7 @@ TypeError: a bytes-like object is required, not 'str'
 (Pdb++)
 ```
 
-### Define The Project Entry Point
+### Define The Project Entrypoint
 
 Example:
 
@@ -129,7 +151,7 @@ setup(
 Activate the entry point in your shell then invoke:
 
 ```shell
-$ foo_cli --help
+❯ foo_cli --help
 NAME
     foo
 
@@ -141,12 +163,12 @@ POSITIONAL ARGUMENTS
 
 FLAGS
     --b=B
-    --pdb_on_error=PDB_ON_ERROR
+    --pdb_=PDB_
 
 NOTES
     You can also use flags syntax for POSITIONAL ARGUMENTS
 
-$ foo_cli this_is_a this_is_b
+❯ foo_cli this_is_a this_is_b
 foo this_is_a this_is_b
 Traceback (most recent call last):
   File "/Users/huntzhan/.pyenv/versions/fireball/bin/fireball", line 6, in <module>
@@ -167,8 +189,8 @@ Traceback (most recent call last):
     assert 0
 AssertionError
 
-$ foo_cli this_is_a this_is_b --pdb_on_error
-[fireball] pdb_on_error: Setup successfully.
+❯ foo_cli this_is_a this_is_b --pdb_
+[fireball] pdb_: Setup successfully.
 foo this_is_a this_is_b
 Traceback (most recent call last):
   File "/Users/huntzhan/.pyenv/versions/fireball/bin/fireball", line 6, in <module>
