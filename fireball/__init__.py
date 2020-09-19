@@ -77,10 +77,11 @@ def fireball_show_params_mtl(arguments_copy):
 def fireball_inject_param(
     name,
     func_contains_param,
-    parameters,
     var_positional_idx,
     var_keyword_idx,
     default,
+    parameters,
+    injected_params,
 ):
     if func_contains_param:
         logger.warning('--%s has been defined, skip.', name)
@@ -101,6 +102,7 @@ def fireball_inject_param(
         default=default,
         kind=kind,
     ))
+    injected_params.add(name)
 
 
 PARAM_PDB = 'pdb_'
@@ -154,42 +156,81 @@ def wrap_func(func):
             assert var_keyword_idx == -1
             var_keyword_idx = param_idx
 
+    injected_params = set()
+
     # PDB.
     fireball_inject_param(
         PARAM_PDB,
         func_contains_param_pdb,
-        parameters,
         var_positional_idx,
         var_keyword_idx,
         False,
+        parameters,
+        injected_params,
     )
     # Show parameters.
     fireball_inject_param(
         PARAM_SHOW_PARAMS,
         func_contains_param_show_params,
-        parameters,
         var_positional_idx,
         var_keyword_idx,
         False,
+        parameters,
+        injected_params,
     )
     # Show parameters (force multi-line).
     fireball_inject_param(
         PARAM_SHOW_PARAMS_MTL,
         func_contains_param_show_params_mtl,
-        parameters,
         var_positional_idx,
         var_keyword_idx,
         False,
+        parameters,
+        injected_params,
     )
 
     new_sig_wrapper = sig_wrapper.replace(parameters=parameters)
     wrapper.__signature__ = new_sig_wrapper
 
+    wrapper.__injected_params__ = injected_params
+
     return wrapper
+
+
+PARAM_SHOW_PARAMS_TPL = 'show_params_tpl_'
+PARAM_SHOW_PARAMS_TPL_MTL = 'show_params_tpl_mtl_'
+
+
+def fireball_show_params_tpl(func, break_limit=None):
+    sig = func.__signature__
+    injected_params = func.__injected_params__
+
+    mock_arguments_copy = {}
+    for param in sig.parameters.values():
+        if param.name in injected_params:
+            continue
+
+        value = param.default
+        if value is inspect.Parameter.empty:
+            value = '<required>'
+
+        mock_arguments_copy[param.name] = value
+
+    if break_limit is None:
+        fireball_meta_show_params(mock_arguments_copy)
+    else:
+        fireball_meta_show_params(mock_arguments_copy, break_limit=0)
 
 
 def cli(func):
     func = wrap_func(func)
+
+    # Show the template of parameters.
+    if f'--{PARAM_SHOW_PARAMS_TPL}' in sys.argv:
+        return lambda: fireball_show_params_tpl(func)
+    if f'--{PARAM_SHOW_PARAMS_TPL_MTL}' in sys.argv:
+        return lambda: fireball_show_params_tpl(func, break_limit=0)
+
     return lambda: fire.Fire(func)
 
 
