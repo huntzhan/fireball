@@ -11,7 +11,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.5"
+python = "^3.6"
 fire = "^0.3.1"
 
 [tool.poetry.dev-dependencies]

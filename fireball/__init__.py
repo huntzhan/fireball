@@ -10,8 +10,8 @@ import traceback
 
 import fire
 
-logging.basicConfig(level=os.getenv('LOGGING_LEVEL', 'INFO'))
-logger = logging.getLogger()
+logging.basicConfig(format='%(message)s', level=os.getenv('LOGGING_LEVEL', 'INFO'))
+logger = logging.getLogger(__name__)
 
 
 def pdb_excepthook(type_, value, traceback_):
@@ -43,10 +43,7 @@ def fireball_take_over_excepthook(option, excepthook):
         sys.excepthook = excepthook
 
 
-def fireball_print_cmd(arguments_copy):
-    break_limit = 79
-    indent = 2
-
+def fireball_meta_show_params(arguments_copy, break_limit=79, indent=2):
     components = ['fireball', sys.argv[0]]
     for key, val in arguments_copy.items():
         if isinstance(val, bool):
@@ -55,7 +52,7 @@ def fireball_print_cmd(arguments_copy):
         else:
             components.append(f"--{key}='{val}'")
 
-    header = 'COMMAND:'
+    header = 'Show parameters:\n'
     one_line = ' '.join(components)
     if len(one_line) <= break_limit:
         logger.info(header + '\n' + one_line + '\n')
@@ -69,7 +66,26 @@ def fireball_print_cmd(arguments_copy):
         logger.info(header + '\n' + '\n'.join(lines) + '\n')
 
 
-def fireball_inject_param(parameters, var_positional_idx, var_keyword_idx, name, default):
+def fireball_show_params(arguments_copy):
+    fireball_meta_show_params(arguments_copy)
+
+
+def fireball_show_params_mtl(arguments_copy):
+    fireball_meta_show_params(arguments_copy, break_limit=0)
+
+
+def fireball_inject_param(
+    name,
+    func_contains_param,
+    parameters,
+    var_positional_idx,
+    var_keyword_idx,
+    default,
+):
+    if func_contains_param:
+        logger.warning('--%s has been defined, skip.', name)
+        return
+
     if var_positional_idx < 0:
         kind = inspect.Parameter.POSITIONAL_OR_KEYWORD
     else:
@@ -87,15 +103,17 @@ def fireball_inject_param(parameters, var_positional_idx, var_keyword_idx, name,
     ))
 
 
-PARAM_PDB_ON_ERROR = 'pdb_on_error'
-PARAM_PRINT_CMD = 'print_cmd'
+PARAM_PDB = 'pdb_'
+PARAM_SHOW_PARAMS = 'show_params_'
+PARAM_SHOW_PARAMS_MTL = 'show_params_mtl_'
 
 
 def wrap_func(func):
     sig_func = inspect.signature(func)
 
-    func_contains_param_pdb_on_error = PARAM_PDB_ON_ERROR in sig_func.parameters
-    func_contains_param_print_cmd = PARAM_PRINT_CMD in sig_func.parameters
+    func_contains_param_pdb = PARAM_PDB in sig_func.parameters
+    func_contains_param_show_params = PARAM_SHOW_PARAMS in sig_func.parameters
+    func_contains_param_show_params_mtl = PARAM_SHOW_PARAMS_MTL in sig_func.parameters
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -105,16 +123,19 @@ def wrap_func(func):
         arguments_copy = bound_args.arguments.copy()
 
         # PDB.
-        if not func_contains_param_pdb_on_error:
-            pdb_on_error = bound_args.arguments.pop(PARAM_PDB_ON_ERROR)
-            if pdb_on_error:
-                fireball_take_over_excepthook(PARAM_PDB_ON_ERROR, pdb_excepthook)
+        if not func_contains_param_pdb:
+            if bound_args.arguments.pop(PARAM_PDB):
+                fireball_take_over_excepthook(PARAM_PDB, pdb_excepthook)
 
-        # Print command.
-        if not func_contains_param_print_cmd:
-            print_cmd = bound_args.arguments.pop(PARAM_PRINT_CMD)
-            if print_cmd:
-                fireball_print_cmd(arguments_copy)
+        # Show parameters.
+        if not func_contains_param_show_params:
+            if bound_args.arguments.pop(PARAM_SHOW_PARAMS):
+                fireball_show_params(arguments_copy)
+
+        # Show parameters (force multi-line).
+        if not func_contains_param_show_params_mtl:
+            if bound_args.arguments.pop(PARAM_SHOW_PARAMS_MTL):
+                fireball_show_params_mtl(arguments_copy)
 
         # python-fire will write this to stdout/stderr.
         return func(*bound_args.args, **bound_args.kwargs)
@@ -134,24 +155,32 @@ def wrap_func(func):
             var_keyword_idx = param_idx
 
     # PDB.
-    if not func_contains_param_pdb_on_error:
-        fireball_inject_param(
-            parameters,
-            var_positional_idx,
-            var_keyword_idx,
-            PARAM_PDB_ON_ERROR,
-            False,
-        )
-
-    # Print command.
-    if not func_contains_param_print_cmd:
-        fireball_inject_param(
-            parameters,
-            var_positional_idx,
-            var_keyword_idx,
-            PARAM_PRINT_CMD,
-            False,
-        )
+    fireball_inject_param(
+        PARAM_PDB,
+        func_contains_param_pdb,
+        parameters,
+        var_positional_idx,
+        var_keyword_idx,
+        False,
+    )
+    # Show parameters.
+    fireball_inject_param(
+        PARAM_SHOW_PARAMS,
+        func_contains_param_show_params,
+        parameters,
+        var_positional_idx,
+        var_keyword_idx,
+        False,
+    )
+    # Show parameters (force multi-line).
+    fireball_inject_param(
+        PARAM_SHOW_PARAMS_MTL,
+        func_contains_param_show_params_mtl,
+        parameters,
+        var_positional_idx,
+        var_keyword_idx,
+        False,
+    )
 
     new_sig_wrapper = sig_wrapper.replace(parameters=parameters)
     wrapper.__signature__ = new_sig_wrapper
