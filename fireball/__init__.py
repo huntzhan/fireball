@@ -5,6 +5,7 @@ import inspect
 import logging
 import os
 import pdb
+import bdb
 import sys
 import traceback
 
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 def pdb_excepthook(type_, value, traceback_):
+    # Quitting pdb should not be caught.
+    if type_ is bdb.BdbQuit:
+        return
+
     logger.error(''.join(traceback.format_exception(type_, value, traceback_)))
     pdb.pm()
 
