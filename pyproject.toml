@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fireball"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["fireball <huntzhan.dev@gmail.com>"]
 license = "MIT"
 description = ""

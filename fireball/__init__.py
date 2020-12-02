@@ -246,7 +246,11 @@ def exec():
     #          ^ sys.argv[1]
     # ^ sys.argv[0]
     if len(sys.argv) < 2:
-        logger.error('fireball <func_path>\nExample: fireball os:getcwd')
+        logger.error(
+            'fireball <module_path>:<func_name>\n'
+            'Example: fireball os:getcwd\n'
+            '         fireball foo/bar.py:baz'
+        )
         sys.exit(1)
 
     func_path = sys.argv[1]
@@ -262,6 +266,12 @@ def exec():
     if not func_name:
         logger.error('Missing func_name.')
         sys.exit(1)
+
+    # Support raw path.
+    if '/' in module_path:
+        module_path = module_path.replace('/', '.')
+    if module_path.endswith('.py'):
+        module_path = module_path[:-3]
 
     # Add the current working directory to sys.path for non-package import.
     cwd_path = os.getcwd()
