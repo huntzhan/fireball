@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fireball"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["fireball <huntzhan.dev@gmail.com>"]
 license = "MIT"
 description = ""
@@ -12,7 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
-fire = "^0.3.1"
+fire = "^0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
