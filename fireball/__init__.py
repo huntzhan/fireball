@@ -24,32 +24,31 @@ def pdb_excepthook(type_, value, traceback_):
     pdb.pm()
 
 
-def fireball_take_over_excepthook(option, excepthook):
+def fireball_take_over_excepthook(excepthook):
     good = True
 
     if hasattr(sys, 'ps1'):
         logger.warning(
-            '--%s: Cannot take-over sys.excepthook '
+            'mode=d: Cannot take-over sys.excepthook '
             'since we are in iterative mode.',
-            option,
         )
         good = False
 
     if not sys.stderr.isatty():
         logger.warning(
-            '--%s: Cannot take-over sys.excepthook '
+            'mode=d: Cannot take-over sys.excepthook '
             'since we don\'t have a tty-like device.',
-            option,
         )
         good = False
 
     if good:
-        logger.debug('--%s: Setup successfully.', option)
+        logger.debug('mode=d: PDB Hooked.')
         sys.excepthook = excepthook
 
 
 def fireball_meta_show_params(arguments_copy, break_limit=79, indent=2):
-    components = ['fireball', sys.argv[0]]
+    entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
+    components = ['fireball', entrypoint]
     for key, val in arguments_copy.items():
         if isinstance(val, bool):
             if val:
@@ -57,7 +56,7 @@ def fireball_meta_show_params(arguments_copy, break_limit=79, indent=2):
         else:
             components.append(f'--{key}="{val}"')
 
-    header = 'Show parameters:\n'
+    header = 'Parameters:\n'
     one_line = ' '.join(components)
     if len(one_line) <= break_limit:
         logger.info(header + '\n' + one_line + '\n')
@@ -79,141 +78,11 @@ def fireball_show_params_mtl(arguments_copy):
     fireball_meta_show_params(arguments_copy, break_limit=0)
 
 
-def fireball_inject_param(
-    name,
-    func_contains_param,
-    var_positional_idx,
-    var_keyword_idx,
-    default,
-    parameters,
-    injected_params,
-):
-    if func_contains_param:
-        logger.warning('--%s has been defined, skip.', name)
-        return
-
-    if var_positional_idx < 0:
-        kind = inspect.Parameter.POSITIONAL_OR_KEYWORD
-    else:
-        kind = inspect.Parameter.KEYWORD_ONLY
-
-    if var_keyword_idx < 0:
-        insert_idx = len(parameters)
-    else:
-        insert_idx = var_keyword_idx
-
-    parameters.insert(insert_idx, inspect.Parameter(
-        name=name,
-        default=default,
-        kind=kind,
-    ))
-    injected_params.add(name)
-
-
-PARAM_PDB = 'pdb_'
-PARAM_SHOW_PARAMS = 'show_params_'
-PARAM_SHOW_PARAMS_MTL = 'show_params_mtl_'
-
-
-def wrap_func(func):
-    sig_func = inspect.signature(func)
-
-    func_contains_param_pdb = PARAM_PDB in sig_func.parameters
-    func_contains_param_show_params = PARAM_SHOW_PARAMS in sig_func.parameters
-    func_contains_param_show_params_mtl = PARAM_SHOW_PARAMS_MTL in sig_func.parameters
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        bound_args = wrapper.__signature__.bind(*args, **kwargs)
-        bound_args.apply_defaults()
-
-        arguments_copy = bound_args.arguments.copy()
-
-        # PDB.
-        if not func_contains_param_pdb:
-            if bound_args.arguments.pop(PARAM_PDB):
-                fireball_take_over_excepthook(PARAM_PDB, pdb_excepthook)
-
-        # Show parameters.
-        if not func_contains_param_show_params:
-            if bound_args.arguments.pop(PARAM_SHOW_PARAMS):
-                fireball_show_params(arguments_copy)
-
-        # Show parameters (force multi-line).
-        if not func_contains_param_show_params_mtl:
-            if bound_args.arguments.pop(PARAM_SHOW_PARAMS_MTL):
-                fireball_show_params_mtl(arguments_copy)
-
-        # python-fire will write this to stdout/stderr.
-        return func(*bound_args.args, **bound_args.kwargs)
-
-    # Patch signature.
-    sig_wrapper = inspect.signature(wrapper)
-    parameters = list(sig_wrapper.parameters.values())
-
-    var_positional_idx = -1
-    var_keyword_idx = -1
-    for param_idx, param in enumerate(parameters):
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            assert var_positional_idx == -1
-            var_positional_idx = param_idx
-        elif param.kind == inspect.Parameter.VAR_KEYWORD:
-            assert var_keyword_idx == -1
-            var_keyword_idx = param_idx
-
-    injected_params = set()
-
-    # PDB.
-    fireball_inject_param(
-        PARAM_PDB,
-        func_contains_param_pdb,
-        var_positional_idx,
-        var_keyword_idx,
-        False,
-        parameters,
-        injected_params,
-    )
-    # Show parameters.
-    fireball_inject_param(
-        PARAM_SHOW_PARAMS,
-        func_contains_param_show_params,
-        var_positional_idx,
-        var_keyword_idx,
-        False,
-        parameters,
-        injected_params,
-    )
-    # Show parameters (force multi-line).
-    fireball_inject_param(
-        PARAM_SHOW_PARAMS_MTL,
-        func_contains_param_show_params_mtl,
-        var_positional_idx,
-        var_keyword_idx,
-        False,
-        parameters,
-        injected_params,
-    )
-
-    new_sig_wrapper = sig_wrapper.replace(parameters=parameters)
-    wrapper.__signature__ = new_sig_wrapper
-
-    wrapper.__injected_params__ = injected_params
-
-    return wrapper
-
-
-PARAM_SHOW_PARAMS_TPL = 'show_params_tpl_'
-PARAM_SHOW_PARAMS_TPL_MTL = 'show_params_tpl_mtl_'
-
-
 def fireball_show_params_tpl(func, break_limit=None):
-    sig = func.__signature__
-    injected_params = func.__injected_params__
+    sig = inspect.signature(func)
 
     mock_arguments_copy = {}
     for param in sig.parameters.values():
-        if param.name in injected_params:
-            continue
 
         value = param.default
         if value is inspect.Parameter.empty:
@@ -227,30 +96,84 @@ def fireball_show_params_tpl(func, break_limit=None):
         fireball_meta_show_params(mock_arguments_copy, break_limit=0)
 
 
-def cli(func):
-    func = wrap_func(func)
+def wrap_func(
+    func,
+    print_template_before_execution,
+    force_multi_line,
+    hook_pdb,
+):
+    sig = inspect.signature(func)
 
-    # Show the template of parameters.
-    if f'--{PARAM_SHOW_PARAMS_TPL}' in sys.argv:
-        return lambda: fireball_show_params_tpl(func)
-    if f'--{PARAM_SHOW_PARAMS_TPL_MTL}' in sys.argv:
-        return lambda: fireball_show_params_tpl(func, break_limit=0)
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+
+        arguments_copy = bound_args.arguments.copy()
+
+        if print_template_before_execution:
+            if force_multi_line:
+                fireball_show_params_mtl(arguments_copy)
+            else:
+                fireball_show_params(arguments_copy)
+
+        if hook_pdb:
+            fireball_take_over_excepthook(pdb_excepthook)
+
+        # python-fire will write this to stdout/stderr.
+        return func(*bound_args.args, **bound_args.kwargs)
+
+    return wrapper
+
+
+def cli(func, modes):
+    modes = {char: True for char in modes}
+
+    print_only_template = modes.pop('t', False)
+    print_template_before_execution = modes.pop('p', False)
+    force_multi_line = modes.pop('m', False)
+    hook_pdb = modes.pop('d', False)
+
+    if modes:
+        logger.error(f'Invalid modes={list(modes)}')
+        sys.exit(1)
+
+    func = wrap_func(
+        func,
+        print_template_before_execution,
+        force_multi_line,
+        hook_pdb,
+    )
+
+    if print_only_template:
+        if force_multi_line:
+            return lambda: fireball_show_params_tpl(func, break_limit=0)
+        else:
+            return lambda: fireball_show_params_tpl(func)
 
     return lambda: fire.Fire(func)
 
 
 def exec():
     # Input.
-    # fireball <module_path>:<func_name> ...
-    #                                    ^ sys.argv[2:]
-    #          ^ sys.argv[1]
+    # fireball <module_path>:<func_name>[:...] ...
+    # |        |                               ^ sys.argv[2:]
+    # |        ^ sys.argv[1]
     # ^ sys.argv[0]
+    error_msg = (
+        'fireball <module_path>:<func_name>[:<modes>] ...\n'
+        '\n'
+        '<modes>:\n'
+        '- "t": print only the template then abort.\n'
+        '- "p": print the template before execution.\n'
+        '- "m": force multi-line format.\n'
+        '- "d": hook pdb.\n'
+        '\n'
+        'Example: fireball os:getcwd\n'
+        '         fireball foo/bar.py:baz\n'
+    )
     if len(sys.argv) < 2:
-        logger.error(
-            'fireball <module_path>:<func_name>\n'
-            'Example: fireball os:getcwd\n'
-            '         fireball foo/bar.py:baz'
-        )
+        logger.error(error_msg)
         sys.exit(1)
 
     func_path = sys.argv[1]
@@ -259,7 +182,17 @@ def exec():
         logger.error('<func_path>: should have format like "foo.bar:baz".')
         sys.exit(1)
 
-    module_path, func_name = func_path.strip().split(':')
+    components = func_path.strip().split(':')
+    if len(components) == 2:
+        module_path, func_name = components
+        modes = None
+    elif len(components) == 3:
+        module_path, func_name, modes = components
+    else:
+        logger.error(f'components={components}')
+        logger.error(error_msg)
+        sys.exit(1)
+
     if not module_path:
         logger.error('Missing module_path.')
         sys.exit(1)
@@ -296,5 +229,5 @@ def exec():
     sys.argv = sys.argv[1:]
 
     # Call function.
-    func_cli = cli(func)
+    func_cli = cli(func, modes)
     func_cli()
