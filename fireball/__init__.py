@@ -127,7 +127,7 @@ def wrap_func(
 
 
 def cli(func, modes):
-    modes = {char: True for char in modes}
+    modes = {char: True for char in modes or ()}
 
     print_only_template = modes.pop('t', False)
     print_template_before_execution = modes.pop('p', False)
