@@ -102,10 +102,10 @@ def fireball_show_params_tpl(func, break_limit=None):
         fireball_meta_show_params(mock_arguments_copy, break_limit=0)
 
 
-def fireball_show_params_heredoc(arguments_copy):
-    lines = ['Heredoc parameters:', '']
+def fireball_show_params_multiline_doc(arguments_copy):
+    lines = ['multiline doc parameters:', '']
 
-    lines.append('fireball - << EOF')
+    lines.append('fireball "$(cat << EOF')
     lines.append('')
 
     lines.append('# Entrypoint')
@@ -123,20 +123,21 @@ def fireball_show_params_heredoc(arguments_copy):
 
     lines.append('')
     lines.append('EOF')
+    lines.append(')"')
 
     logger.info('\n'.join(lines))
 
 
-def fireball_show_params_heredoc_tpl(func):
+def fireball_show_params_multiline_doc_tpl(func):
     mock_arguments_copy = fireball_mock_arguments(func)
-    fireball_show_params_heredoc(mock_arguments_copy)
+    fireball_show_params_multiline_doc(mock_arguments_copy)
 
 
 def wrap_func(
     func,
     print_template_before_execution,
-    force_heredoc,
-    force_multi_line,
+    force_multiline_doc,
+    force_multiline,
     hook_pdb,
 ):
     sig = inspect.signature(func)
@@ -149,9 +150,9 @@ def wrap_func(
         arguments_copy = bound_args.arguments.copy()
 
         if print_template_before_execution:
-            if force_heredoc:
-                fireball_show_params_heredoc(arguments_copy)
-            elif force_multi_line:
+            if force_multiline_doc:
+                fireball_show_params_multiline_doc(arguments_copy)
+            elif force_multiline:
                 fireball_show_params_mtl(arguments_copy)
             else:
                 fireball_show_params(arguments_copy)
@@ -170,8 +171,8 @@ def cli(func, modes):
 
     print_only_template = modes.pop('t', False)
     print_template_before_execution = modes.pop('p', False)
-    force_heredoc = modes.pop('h', False)
-    force_multi_line = modes.pop('m', False)
+    force_multiline_doc = modes.pop('h', False)
+    force_multiline = modes.pop('m', False)
     hook_pdb = modes.pop('d', False)
 
     if modes:
@@ -181,15 +182,15 @@ def cli(func, modes):
     func = wrap_func(
         func,
         print_template_before_execution,
-        force_heredoc,
-        force_multi_line,
+        force_multiline_doc,
+        force_multiline,
         hook_pdb,
     )
 
     if print_only_template:
-        if force_heredoc:
-            return lambda: fireball_show_params_heredoc_tpl(func)
-        elif force_multi_line:
+        if force_multiline_doc:
+            return lambda: fireball_show_params_multiline_doc_tpl(func)
+        elif force_multiline:
             return lambda: fireball_show_params_tpl(func, break_limit=0)
         else:
             return lambda: fireball_show_params_tpl(func)
@@ -211,7 +212,7 @@ fireball <module_path>:<func_name>[:<modes>] ...
 Supported <modes>:
 - "t": print only the template then abort.
 - "p": print the template before execution.
-- "h": force heredoc format.
+- "h": force multiline_doc format.
 - "m": force multi-line format.
 - "d": hook pdb.
 
@@ -222,7 +223,7 @@ fireball base64:b64encode:tm
 fireball foo/bar.py:baz
 
 
-# Heredoc style
+# multiline_doc style
 
 fireball - << EOF
 <module_path>:<func_name>[:<modes>]
@@ -231,7 +232,7 @@ EOF
 
 Example:
 
-fireball - << EOF
+fireball "$(cat << EOF
 
 # Entrypoint
 base64:b64encode
@@ -241,6 +242,7 @@ base64:b64encode
 --altchars="None"
 
 EOF
+)"
 '''
     if len(argv) < 2:
         logger.error(help_msg)
@@ -303,19 +305,17 @@ EOF
     func_cli()
 
 
-def parse_heredoc():
+def parse_multiline_doc(multiline_doc):
     argv = ['fireball']
-    argv.extend(shlex.split(sys.stdin.read(), comments=True))
-    # Hack to reset stdin to enable breakpoint()
-    sys.stdin = open('/dev/tty')
+    argv.extend(shlex.split(multiline_doc, comments=True))
     return argv
 
 
 def exec():
     argv = sys.argv
 
-    if len(argv) == 2 and argv[1] == '-':
-        # heredoc style.
-        argv = parse_heredoc()
+    if len(argv) == 2 and '\n' in argv[1]:
+        # multiline_doc style.
+        argv = parse_multiline_doc(argv[1])
 
     exec_argv(argv)
