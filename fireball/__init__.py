@@ -7,6 +7,7 @@ import os
 import pdb
 import bdb
 import sys
+import shlex
 import traceback
 
 import fire
@@ -46,7 +47,7 @@ def fireball_take_over_excepthook(excepthook):
         sys.excepthook = excepthook
 
 
-def fireball_meta_show_params(arguments_copy, break_limit=79, indent=2):
+def fireball_meta_show_params(arguments_copy, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
     components = ['fireball', entrypoint]
     for key, val in arguments_copy.items():
@@ -78,7 +79,7 @@ def fireball_show_params_mtl(arguments_copy):
     fireball_meta_show_params(arguments_copy, break_limit=0)
 
 
-def fireball_show_params_tpl(func, break_limit=None):
+def fireball_mock_arguments(func):
     sig = inspect.signature(func)
 
     mock_arguments_copy = {}
@@ -90,15 +91,51 @@ def fireball_show_params_tpl(func, break_limit=None):
 
         mock_arguments_copy[param.name] = value
 
+    return mock_arguments_copy
+
+
+def fireball_show_params_tpl(func, break_limit=None):
+    mock_arguments_copy = fireball_mock_arguments(func)
     if break_limit is None:
         fireball_meta_show_params(mock_arguments_copy)
     else:
         fireball_meta_show_params(mock_arguments_copy, break_limit=0)
 
 
+def fireball_show_params_heredoc(arguments_copy):
+    lines = ['Heredoc parameters:', '']
+
+    lines.append('fireball - << EOF')
+    lines.append('')
+
+    lines.append('# Entrypoint')
+    entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
+    lines.append(entrypoint)
+    lines.append('')
+
+    lines.append('# Arguments')
+    for key, val in arguments_copy.items():
+        if isinstance(val, bool):
+            if val:
+                lines.append(f'--{key}')
+        else:
+            lines.append(f'--{key}="{val}"')
+
+    lines.append('')
+    lines.append('EOF')
+
+    logger.info('\n'.join(lines))
+
+
+def fireball_show_params_heredoc_tpl(func):
+    mock_arguments_copy = fireball_mock_arguments(func)
+    fireball_show_params_heredoc(mock_arguments_copy)
+
+
 def wrap_func(
     func,
     print_template_before_execution,
+    force_heredoc,
     force_multi_line,
     hook_pdb,
 ):
@@ -112,7 +149,9 @@ def wrap_func(
         arguments_copy = bound_args.arguments.copy()
 
         if print_template_before_execution:
-            if force_multi_line:
+            if force_heredoc:
+                fireball_show_params_heredoc(arguments_copy)
+            elif force_multi_line:
                 fireball_show_params_mtl(arguments_copy)
             else:
                 fireball_show_params(arguments_copy)
@@ -131,6 +170,7 @@ def cli(func, modes):
 
     print_only_template = modes.pop('t', False)
     print_template_before_execution = modes.pop('p', False)
+    force_heredoc = modes.pop('h', False)
     force_multi_line = modes.pop('m', False)
     hook_pdb = modes.pop('d', False)
 
@@ -141,12 +181,15 @@ def cli(func, modes):
     func = wrap_func(
         func,
         print_template_before_execution,
+        force_heredoc,
         force_multi_line,
         hook_pdb,
     )
 
     if print_only_template:
-        if force_multi_line:
+        if force_heredoc:
+            return lambda: fireball_show_params_heredoc_tpl(func)
+        elif force_multi_line:
             return lambda: fireball_show_params_tpl(func, break_limit=0)
         else:
             return lambda: fireball_show_params_tpl(func)
@@ -154,29 +197,56 @@ def cli(func, modes):
     return lambda: fire.Fire(func)
 
 
-def exec():
-    # Input.
+def exec_argv(argv):
+    # Input:
     # fireball <module_path>:<func_name>[:...] ...
-    # |        |                               ^ sys.argv[2:]
-    # |        ^ sys.argv[1]
-    # ^ sys.argv[0]
-    error_msg = (
-        'fireball <module_path>:<func_name>[:<modes>] ...\n'
-        '\n'
-        '<modes>:\n'
-        '- "t": print only the template then abort.\n'
-        '- "p": print the template before execution.\n'
-        '- "m": force multi-line format.\n'
-        '- "d": hook pdb.\n'
-        '\n'
-        'Example: fireball os:getcwd\n'
-        '         fireball foo/bar.py:baz\n'
-    )
-    if len(sys.argv) < 2:
-        logger.error(error_msg)
+    # |        |                               ^ argv[2:]
+    # |        ^ argv[1]
+    # ^ argv[0]
+    help_msg = '''
+# Default style
+
+fireball <module_path>:<func_name>[:<modes>] ...
+
+Supported <modes>:
+- "t": print only the template then abort.
+- "p": print the template before execution.
+- "h": force heredoc format.
+- "m": force multi-line format.
+- "d": hook pdb.
+
+Example:
+
+fireball os:getcwd
+fireball base64:b64encode:tm
+fireball foo/bar.py:baz
+
+
+# Heredoc style
+
+fireball - << EOF
+<module_path>:<func_name>[:<modes>]
+...
+EOF
+
+Example:
+
+fireball - << EOF
+
+# Entrypoint
+base64:b64encode
+
+# Arguments
+--s="<required>"
+--altchars="None"
+
+EOF
+'''
+    if len(argv) < 2:
+        logger.error(help_msg)
         sys.exit(1)
 
-    func_path = sys.argv[1]
+    func_path = argv[1]
 
     if ':' not in func_path:
         logger.error('<func_path>: should have format like "foo.bar:baz".')
@@ -190,7 +260,7 @@ def exec():
         module_path, func_name, modes = components
     else:
         logger.error(f'components={components}')
-        logger.error(error_msg)
+        logger.error(help_msg)
         sys.exit(1)
 
     if not module_path:
@@ -226,8 +296,24 @@ def exec():
         sys.exit(1)
 
     # Patch to <module_path>:<func_name> ...
-    sys.argv = sys.argv[1:]
+    sys.argv = argv[1:]
 
     # Call function.
     func_cli = cli(func, modes)
     func_cli()
+
+
+def parse_heredoc():
+    argv = ['fireball']
+    argv.extend(shlex.split(sys.stdin.read(), comments=True))
+    return argv
+
+
+def exec():
+    argv = sys.argv
+
+    if len(argv) == 2 and argv[1] == '-':
+        # heredoc style.
+        argv = parse_heredoc()
+
+    exec_argv(argv)
