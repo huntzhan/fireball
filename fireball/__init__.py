@@ -306,6 +306,8 @@ EOF
 def parse_heredoc():
     argv = ['fireball']
     argv.extend(shlex.split(sys.stdin.read(), comments=True))
+    # Hack to reset stdin to enable breakpoint()
+    sys.stdin = open('/dev/tty')
     return argv
 
 
