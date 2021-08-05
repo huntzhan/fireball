@@ -171,7 +171,7 @@ def wrap_func(
         if hook_profiler:
             profiler.stop()
             logger.info('profiler.print():')
-            profiler.print()
+            profiler.print(show_all=True)
 
         return out
 
