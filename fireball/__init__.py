@@ -11,8 +11,8 @@ import shlex
 import traceback
 
 import fire
+from pyinstrument import Profiler
 
-logging.basicConfig(format='%(message)s', level=os.getenv('LOGGING_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
 
 
@@ -135,10 +135,11 @@ def fireball_show_params_multiline_doc_tpl(func):
 
 def wrap_func(
     func,
-    print_template_before_execution,
+    is_verbose,
     force_multiline_doc,
     force_multiline,
     hook_pdb,
+    hook_profiler,
 ):
     sig = inspect.signature(func)
 
@@ -149,7 +150,7 @@ def wrap_func(
 
         arguments_copy = bound_args.arguments.copy()
 
-        if print_template_before_execution:
+        if is_verbose:
             if force_multiline_doc:
                 fireball_show_params_multiline_doc(arguments_copy)
             elif force_multiline:
@@ -160,8 +161,19 @@ def wrap_func(
         if hook_pdb:
             fireball_take_over_excepthook(pdb_excepthook)
 
-        # python-fire will write this to stdout/stderr.
-        return func(*bound_args.args, **bound_args.kwargs)
+        profiler = None
+        if hook_profiler:
+            profiler = Profiler()
+            profiler.start()
+
+        out = func(*bound_args.args, **bound_args.kwargs)
+
+        if hook_profiler:
+            profiler.stop()
+            logger.info('profiler.print():')
+            profiler.print()
+
+        return out
 
     return wrapper
 
@@ -170,21 +182,23 @@ def cli(func, modes):
     modes = {char: True for char in modes or ()}
 
     print_only_template = modes.pop('t', False)
-    print_template_before_execution = modes.pop('p', False)
+    is_verbose = modes.pop('v', False)
     force_multiline_doc = modes.pop('h', False)
     force_multiline = modes.pop('m', False)
     hook_pdb = modes.pop('d', False)
+    hook_profiler = modes.pop('p', False)
 
     if modes:
         logger.error(f'Invalid modes={list(modes)}')
         sys.exit(1)
 
     func = wrap_func(
-        func,
-        print_template_before_execution,
-        force_multiline_doc,
-        force_multiline,
-        hook_pdb,
+        func=func,
+        is_verbose=is_verbose,
+        force_multiline_doc=force_multiline,
+        force_multiline=force_multiline,
+        hook_pdb=hook_pdb,
+        hook_profiler=hook_profiler,
     )
 
     if print_only_template:
@@ -211,10 +225,11 @@ fireball <module_path>:<func_name>[:<modes>] ...
 
 Supported <modes>:
 - "t": print only the template then abort.
-- "p": print the template before execution.
+- "v": verbose mode, i.e. the template before execution.
 - "h": force multiline_doc format.
 - "m": force multi-line format.
 - "d": hook pdb.
+- "p": hook profiler (pyinstrument).
 
 Example:
 
@@ -223,7 +238,7 @@ fireball base64:b64encode:tm
 fireball foo/bar.py:baz
 
 
-# multiline_doc style
+# Multiline doc style
 
 fireball - << EOF
 <module_path>:<func_name>[:<modes>]
@@ -312,6 +327,11 @@ def parse_multiline_doc(multiline_doc):
 
 
 def exec():
+    logging.basicConfig(
+        format=os.getenv('LOGGING_FORMAT', '%(message)s'),
+        level=os.getenv('LOGGING_LEVEL', 'INFO'),
+    )
+
     argv = sys.argv
 
     if len(argv) == 2 and '\n' in argv[1]:
