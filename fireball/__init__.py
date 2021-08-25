@@ -17,6 +17,10 @@ from pyinstrument import Profiler
 logger = logging.getLogger(__name__)
 
 
+class ExecName:
+    exec_name = None
+
+
 def pdb_excepthook(type_, value, traceback_):
     # Quitting pdb should not be caught.
     if type_ is bdb.BdbQuit:
@@ -50,7 +54,7 @@ def take_over_excepthook(excepthook):
 
 def print_template(arguments_copy, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
-    components = ['fireball', entrypoint]
+    components = [ExecName.exec_name, entrypoint]
     for key, val in arguments_copy.items():
         if isinstance(val, bool):
             if val:
@@ -79,7 +83,7 @@ def print_template_multiline(arguments_copy):
 def print_template_multiline_doc(arguments_copy):
     lines = ['multiline doc parameters:', '']
 
-    lines.append('fireball "$(cat << EOF')
+    lines.append(f'{ExecName.exec_name} "$(cat << EOF')
     lines.append('')
 
     lines.append('# Entrypoint')
@@ -189,7 +193,8 @@ def parse_modes_text(modes_text):
             try:
                 mode, val = component.split('=')
             except Exception:
-                raise RuntimeError(f'Fail to split component={component} into mode and value.')
+                logger.error(f'Fail to split component={component} into mode and value.')
+                sys.exit(1)
         else:
             mode = component
             val = None
@@ -199,18 +204,21 @@ def parse_modes_text(modes_text):
         elif mode in mode_name_abbr_to_desc:
             mode_desc = mode_name_abbr_to_desc[mode]
         else:
-            raise RuntimeError(f'Invalid mode={mode}')
+            logger.error(f'Invalid mode={mode}')
+            sys.exit(1)
 
         if mode_desc.type is not bool:
             if val is None:
-                raise RuntimeError(f'Missing value for mode={mode}')
+                logger.error(f'Missing value for mode={mode}')
+                sys.exit(1)
             try:
                 val = mode_desc.type(val)
             except Exception:
-                raise RuntimeError(
+                logger.error(
                     f'Failed to convert val={val} to {mode_desc.type} '
                     f'as instructed in mode_desc={mode_desc}.'
                 )
+                sys.exit(1)
         else:
             if val:
                 val = bool(val)
@@ -238,7 +246,8 @@ def cli(func, modes_text):
     elif template_format == 'multiline-doc':
         flag_template_format_multiline_doc = True
     elif template_format:
-        raise RuntimeError(f'Invalid template_format={template_format}')
+        logger.error(f'Invalid template_format={template_format}')
+        sys.exit(1)
 
     func = wrap_func(
         func=func,
@@ -260,12 +269,23 @@ def cli(func, modes_text):
     return lambda: fire.Fire(func)
 
 
+def get_exec_name(argv):
+    if argv[0].endswith('fib'):
+        return 'fib'
+    elif argv[0].endswith('fireball'):
+        return 'fireball'
+    logger.error(f'Invalid argv[0]={argv[0]}')
+    sys.exit(1)
+
+
 def exec_argv(argv):
     # Input:
     # fireball <module_path>:<func_name>[:...] ...
     # |        |                               ^ argv[2:]
     # |        ^ argv[1]
     # ^ argv[0]
+    ExecName.exec_name = get_exec_name(argv)
+
     modes_msg = []
     for mode_desc in mode_descs:
         modes_msg.append(f'- {mode_desc.name}, {mode_desc.name_abbr}: {mode_desc.msg}')
@@ -274,7 +294,7 @@ def exec_argv(argv):
     help_msg = f'''
 # Default style
 
-fireball <module_path>:<func_name>[:<modes>] ...
+{ExecName.exec_name} <module_path>:<func_name>[:<modes>] ...
 
 Supported <modes> (comma-seperated):
 
@@ -282,28 +302,28 @@ Supported <modes> (comma-seperated):
 
 Example:
 
-fireball os:getcwd
-fireball base64:b64encode:pot
-fireball base64:b64encode:pot,tfm=multiline
-fireball foo/bar.py:baz
+{ExecName.exec_name} os:getcwd
+{ExecName.exec_name} base64:b64encode:pot
+{ExecName.exec_name} base64:b64encode:pot,tf=multiline
+{ExecName.exec_name} foo/bar.py:baz
 
 
 # Multiline doc style
 
-fireball - << EOF
+{ExecName.exec_name} - << EOF
 <module_path>:<func_name>[:<modes>]
 ...
 EOF
 
 Example:
 
-fireball "$(cat << EOF
+{ExecName.exec_name} "$(cat << EOF
 
 # Entrypoint
 base64:b64encode
 
 # Arguments
---s="<required>"
+--s="b'{ExecName.exec_name}'"
 --altchars="None"
 
 EOF
@@ -370,8 +390,8 @@ EOF
     func_cli()
 
 
-def parse_multiline_doc(multiline_doc):
-    argv = ['fireball']
+def parse_multiline_doc(exec_name, multiline_doc):
+    argv = [exec_name]
     argv.extend(shlex.split(multiline_doc, comments=True))
     return argv
 
@@ -386,6 +406,6 @@ def exec():
 
     if len(argv) == 2 and '\n' in argv[1]:
         # multiline_doc style.
-        argv = parse_multiline_doc(argv[1])
+        argv = parse_multiline_doc(get_exec_name(argv), argv[1])
 
     exec_argv(argv)
