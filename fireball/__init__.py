@@ -48,7 +48,7 @@ def take_over_excepthook(excepthook):
         sys.excepthook = excepthook
 
 
-def meta_print_template(arguments_copy, break_limit=79, indent=4):
+def print_template(arguments_copy, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
     components = ['fireball', entrypoint]
     for key, val in arguments_copy.items():
@@ -72,38 +72,11 @@ def meta_print_template(arguments_copy, break_limit=79, indent=4):
         logger.info(header + '\n' + '\n'.join(lines) + '\n')
 
 
-def show_params(arguments_copy):
-    meta_print_template(arguments_copy)
-
-
 def print_template_multiline(arguments_copy):
-    meta_print_template(arguments_copy, break_limit=0)
+    print_template(arguments_copy, break_limit=0)
 
 
-def mock_arguments(func):
-    sig = inspect.signature(func)
-
-    mock_arguments_copy = {}
-    for param in sig.parameters.values():
-
-        value = param.default
-        if value is inspect.Parameter.empty:
-            value = '<required>'
-
-        mock_arguments_copy[param.name] = value
-
-    return mock_arguments_copy
-
-
-def print_template(func, break_limit=None):
-    mock_arguments_copy = mock_arguments(func)
-    if break_limit is None:
-        meta_print_template(mock_arguments_copy)
-    else:
-        meta_print_template(mock_arguments_copy, break_limit=0)
-
-
-def print_template_multiline_doc_from_arguments(arguments_copy):
+def print_template_multiline_doc(arguments_copy):
     lines = ['multiline doc parameters:', '']
 
     lines.append('fireball "$(cat << EOF')
@@ -129,18 +102,28 @@ def print_template_multiline_doc_from_arguments(arguments_copy):
     logger.info('\n'.join(lines))
 
 
-def print_template_multiline_doc(func):
-    mock_arguments_copy = mock_arguments(func)
-    print_template_multiline_doc_from_arguments(mock_arguments_copy)
+def mock_arguments(func):
+    sig = inspect.signature(func)
+
+    mock_arguments_copy = {}
+    for param in sig.parameters.values():
+
+        value = param.default
+        if value is inspect.Parameter.empty:
+            value = '<required>'
+
+        mock_arguments_copy[param.name] = value
+
+    return mock_arguments_copy
 
 
 def wrap_func(
     func,
-    print_template,
-    template_format_multiline_doc,
-    template_format_multiline,
-    hook_debugger,
-    hook_profiler,
+    flag_print_template,
+    flag_template_format_multiline_doc,
+    flag_template_format_multiline,
+    flag_hook_debugger,
+    flag_hook_profiler,
 ):
     sig = inspect.signature(func)
 
@@ -151,25 +134,25 @@ def wrap_func(
 
         arguments_copy = bound_args.arguments.copy()
 
-        if print_template:
-            if template_format_multiline_doc:
+        if flag_print_template:
+            if flag_template_format_multiline_doc:
                 print_template_multiline_doc(arguments_copy)
-            elif template_format_multiline:
+            elif flag_template_format_multiline:
                 print_template_multiline(arguments_copy)
             else:
-                show_params(arguments_copy)
+                print_template(arguments_copy)
 
-        if hook_debugger:
+        if flag_hook_debugger:
             take_over_excepthook(pdb_excepthook)
 
         profiler = None
-        if hook_profiler:
+        if flag_hook_profiler:
             profiler = Profiler()
             profiler.start()
 
         out = func(*bound_args.args, **bound_args.kwargs)
 
-        if hook_profiler:
+        if flag_hook_profiler:
             profiler.stop()
             logger.info('profiler.print():')
             profiler.print(show_all=True)
@@ -184,7 +167,7 @@ ModeDesc = namedtuple('Mode', ['name', 'name_abbr', 'type', 'msg'])
 mode_descs = [
     ModeDesc('print-template', 'pt', bool, 'print the template.'),
     ModeDesc('print-only-template', 'pot', bool, 'print only the template then abort.'),
-    ModeDesc('template-format', 'tfm', str, 'force to multiline/multiline-doc format.'),
+    ModeDesc('template-format', 'tf', str, 'force to multiline/multiline-doc format.'),
     ModeDesc('hook-debugger', 'hd', bool, 'hook debugger (pdb).'),
     ModeDesc('hook-profiler', 'hp', bool, 'hook profiler (pyinstrument).'),
 ]
@@ -248,31 +231,31 @@ def cli(func, modes_text):
     mode_to_val = parse_modes_text(modes_text)
 
     template_format = mode_to_val['template-format']
-    template_format_multiline = False
-    template_format_multiline_doc = False
+    flag_template_format_multiline = False
+    flag_template_format_multiline_doc = False
     if template_format == 'multiline':
-        template_format_multiline = True
+        flag_template_format_multiline = True
     elif template_format == 'multiline-doc':
-        template_format_multiline_doc = True
+        flag_template_format_multiline_doc = True
     elif template_format:
         raise RuntimeError(f'Invalid template_format={template_format}')
 
     func = wrap_func(
         func=func,
-        print_template=mode_to_val['print-template'],
-        template_format_multiline_doc=template_format_multiline_doc,
-        template_format_multiline=template_format_multiline,
-        hook_debugger=mode_to_val['hook-debugger'],
-        hook_profiler=mode_to_val['hook-profiler'],
+        flag_print_template=mode_to_val['print-template'],
+        flag_template_format_multiline_doc=flag_template_format_multiline_doc,
+        flag_template_format_multiline=flag_template_format_multiline,
+        flag_hook_debugger=mode_to_val['hook-debugger'],
+        flag_hook_profiler=mode_to_val['hook-profiler'],
     )
 
     if mode_to_val['print-only-template']:
-        if template_format_multiline_doc:
-            return lambda: print_template_multiline_doc(func)
-        elif template_format_multiline:
-            return lambda: print_template(func, break_limit=0)
+        if flag_template_format_multiline_doc:
+            return lambda: print_template_multiline_doc(mock_arguments(func))
+        elif flag_template_format_multiline:
+            return lambda: print_template_multiline(mock_arguments(func))
         else:
-            return lambda: print_template(func)
+            return lambda: print_template(mock_arguments(func))
 
     return lambda: fire.Fire(func)
 
