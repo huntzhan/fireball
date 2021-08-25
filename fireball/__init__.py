@@ -9,6 +9,7 @@ import bdb
 import sys
 import shlex
 import traceback
+from collections import namedtuple
 
 import fire
 from pyinstrument import Profiler
@@ -25,7 +26,7 @@ def pdb_excepthook(type_, value, traceback_):
     pdb.pm()
 
 
-def fireball_take_over_excepthook(excepthook):
+def take_over_excepthook(excepthook):
     good = True
 
     if hasattr(sys, 'ps1'):
@@ -47,7 +48,7 @@ def fireball_take_over_excepthook(excepthook):
         sys.excepthook = excepthook
 
 
-def fireball_meta_show_params(arguments_copy, break_limit=79, indent=4):
+def meta_print_template(arguments_copy, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
     components = ['fireball', entrypoint]
     for key, val in arguments_copy.items():
@@ -71,15 +72,15 @@ def fireball_meta_show_params(arguments_copy, break_limit=79, indent=4):
         logger.info(header + '\n' + '\n'.join(lines) + '\n')
 
 
-def fireball_show_params(arguments_copy):
-    fireball_meta_show_params(arguments_copy)
+def show_params(arguments_copy):
+    meta_print_template(arguments_copy)
 
 
-def fireball_show_params_mtl(arguments_copy):
-    fireball_meta_show_params(arguments_copy, break_limit=0)
+def print_template_multiline(arguments_copy):
+    meta_print_template(arguments_copy, break_limit=0)
 
 
-def fireball_mock_arguments(func):
+def mock_arguments(func):
     sig = inspect.signature(func)
 
     mock_arguments_copy = {}
@@ -94,15 +95,15 @@ def fireball_mock_arguments(func):
     return mock_arguments_copy
 
 
-def fireball_show_params_tpl(func, break_limit=None):
-    mock_arguments_copy = fireball_mock_arguments(func)
+def print_template(func, break_limit=None):
+    mock_arguments_copy = mock_arguments(func)
     if break_limit is None:
-        fireball_meta_show_params(mock_arguments_copy)
+        meta_print_template(mock_arguments_copy)
     else:
-        fireball_meta_show_params(mock_arguments_copy, break_limit=0)
+        meta_print_template(mock_arguments_copy, break_limit=0)
 
 
-def fireball_show_params_multiline_doc(arguments_copy):
+def print_template_multiline_doc_from_arguments(arguments_copy):
     lines = ['multiline doc parameters:', '']
 
     lines.append('fireball "$(cat << EOF')
@@ -128,17 +129,17 @@ def fireball_show_params_multiline_doc(arguments_copy):
     logger.info('\n'.join(lines))
 
 
-def fireball_show_params_multiline_doc_tpl(func):
-    mock_arguments_copy = fireball_mock_arguments(func)
-    fireball_show_params_multiline_doc(mock_arguments_copy)
+def print_template_multiline_doc(func):
+    mock_arguments_copy = mock_arguments(func)
+    print_template_multiline_doc_from_arguments(mock_arguments_copy)
 
 
 def wrap_func(
     func,
-    is_verbose,
-    force_multiline_doc,
-    force_multiline,
-    hook_pdb,
+    print_template,
+    template_format_multiline_doc,
+    template_format_multiline,
+    hook_debugger,
     hook_profiler,
 ):
     sig = inspect.signature(func)
@@ -150,16 +151,16 @@ def wrap_func(
 
         arguments_copy = bound_args.arguments.copy()
 
-        if is_verbose:
-            if force_multiline_doc:
-                fireball_show_params_multiline_doc(arguments_copy)
-            elif force_multiline:
-                fireball_show_params_mtl(arguments_copy)
+        if print_template:
+            if template_format_multiline_doc:
+                print_template_multiline_doc(arguments_copy)
+            elif template_format_multiline:
+                print_template_multiline(arguments_copy)
             else:
-                fireball_show_params(arguments_copy)
+                show_params(arguments_copy)
 
-        if hook_pdb:
-            fireball_take_over_excepthook(pdb_excepthook)
+        if hook_debugger:
+            take_over_excepthook(pdb_excepthook)
 
         profiler = None
         if hook_profiler:
@@ -178,36 +179,100 @@ def wrap_func(
     return wrapper
 
 
-def cli(func, modes):
-    modes = {char: True for char in modes or ()}
+ModeDesc = namedtuple('Mode', ['name', 'name_abbr', 'type', 'msg'])
 
-    print_only_template = modes.pop('t', False)
-    is_verbose = modes.pop('v', False)
-    force_multiline_doc = modes.pop('h', False)
-    force_multiline = modes.pop('m', False)
-    hook_pdb = modes.pop('d', False)
-    hook_profiler = modes.pop('p', False)
+mode_descs = [
+    ModeDesc('print-template', 'pt', bool, 'print the template.'),
+    ModeDesc('print-only-template', 'pot', bool, 'print only the template then abort.'),
+    ModeDesc('template-format', 'tfm', str, 'force to multiline/multiline-doc format.'),
+    ModeDesc('hook-debugger', 'hd', bool, 'hook debugger (pdb).'),
+    ModeDesc('hook-profiler', 'hp', bool, 'hook profiler (pyinstrument).'),
+]
+mode_name_to_desc = {mode_desc.name: mode_desc for mode_desc in mode_descs}
+mode_name_abbr_to_desc = {mode_desc.name_abbr: mode_desc for mode_desc in mode_descs}
 
-    if modes:
-        logger.error(f'Invalid modes={list(modes)}')
-        sys.exit(1)
+
+def parse_modes_text(modes_text):
+    mode_to_val = {}
+
+    # Extarct.
+    components = ()
+    if modes_text:
+        components = modes_text.split(',')
+
+    for component in components:
+        component = component.strip()
+        if '=' in component:
+            try:
+                mode, val = component.split('=')
+            except Exception:
+                raise RuntimeError(f'Fail to split component={component} into mode and value.')
+        else:
+            mode = component
+            val = None
+
+        if mode in mode_name_to_desc:
+            mode_desc = mode_name_to_desc[mode]
+        elif mode in mode_name_abbr_to_desc:
+            mode_desc = mode_name_abbr_to_desc[mode]
+        else:
+            raise RuntimeError(f'Invalid mode={mode}')
+
+        if mode_desc.type is not bool:
+            if val is None:
+                raise RuntimeError(f'Missing value for mode={mode}')
+            try:
+                val = mode_desc.type(val)
+            except Exception:
+                raise RuntimeError(
+                    f'Failed to convert val={val} to {mode_desc.type} '
+                    f'as instructed in mode_desc={mode_desc}.'
+                )
+        else:
+            if val:
+                val = bool(val)
+            else:
+                val = True
+
+        mode_to_val[mode_desc.name] = val
+
+    # Fill the missing modes.
+    for mode_desc in mode_descs:
+        if mode_desc.name not in mode_to_val:
+            mode_to_val[mode_desc.name] = mode_desc.type()
+
+    return mode_to_val
+
+
+def cli(func, modes_text):
+    mode_to_val = parse_modes_text(modes_text)
+
+    template_format = mode_to_val['template-format']
+    template_format_multiline = False
+    template_format_multiline_doc = False
+    if template_format == 'multiline':
+        template_format_multiline = True
+    elif template_format == 'multiline-doc':
+        template_format_multiline_doc = True
+    elif template_format:
+        raise RuntimeError(f'Invalid template_format={template_format}')
 
     func = wrap_func(
         func=func,
-        is_verbose=is_verbose,
-        force_multiline_doc=force_multiline,
-        force_multiline=force_multiline,
-        hook_pdb=hook_pdb,
-        hook_profiler=hook_profiler,
+        print_template=mode_to_val['print-template'],
+        template_format_multiline_doc=template_format_multiline_doc,
+        template_format_multiline=template_format_multiline,
+        hook_debugger=mode_to_val['hook-debugger'],
+        hook_profiler=mode_to_val['hook-profiler'],
     )
 
-    if print_only_template:
-        if force_multiline_doc:
-            return lambda: fireball_show_params_multiline_doc_tpl(func)
-        elif force_multiline:
-            return lambda: fireball_show_params_tpl(func, break_limit=0)
+    if mode_to_val['print-only-template']:
+        if template_format_multiline_doc:
+            return lambda: print_template_multiline_doc(func)
+        elif template_format_multiline:
+            return lambda: print_template(func, break_limit=0)
         else:
-            return lambda: fireball_show_params_tpl(func)
+            return lambda: print_template(func)
 
     return lambda: fire.Fire(func)
 
@@ -218,23 +283,25 @@ def exec_argv(argv):
     # |        |                               ^ argv[2:]
     # |        ^ argv[1]
     # ^ argv[0]
-    help_msg = '''
+    modes_msg = []
+    for mode_desc in mode_descs:
+        modes_msg.append(f'- {mode_desc.name}, {mode_desc.name_abbr}: {mode_desc.msg}')
+    modes_msg = '\n'.join(modes_msg)
+
+    help_msg = f'''
 # Default style
 
 fireball <module_path>:<func_name>[:<modes>] ...
 
-Supported <modes>:
-- "t": print only the template then abort.
-- "v": verbose mode, i.e. the template before execution.
-- "h": force multiline_doc format.
-- "m": force multi-line format.
-- "d": hook pdb.
-- "p": hook profiler (pyinstrument).
+Supported <modes> (comma-seperated):
+
+{modes_msg}
 
 Example:
 
 fireball os:getcwd
-fireball base64:b64encode:tm
+fireball base64:b64encode:pot
+fireball base64:b64encode:pot,tfm=multiline
 fireball foo/bar.py:baz
 
 
@@ -272,9 +339,9 @@ EOF
     components = func_path.strip().split(':')
     if len(components) == 2:
         module_path, func_name = components
-        modes = None
+        modes_text = None
     elif len(components) == 3:
-        module_path, func_name, modes = components
+        module_path, func_name, modes_text = components
     else:
         logger.error(f'components={components}')
         logger.error(help_msg)
@@ -316,7 +383,7 @@ EOF
     sys.argv = argv[1:]
 
     # Call function.
-    func_cli = cli(func, modes)
+    func_cli = cli(func, modes_text)
     func_cli()
 
 

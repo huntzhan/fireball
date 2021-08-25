@@ -13,3 +13,7 @@ def test_profiler():
     import time
     time.sleep(1)
     some_opt()
+
+
+def test_exp():
+    assert 0
