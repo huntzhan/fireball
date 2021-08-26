@@ -247,12 +247,16 @@ def cli(func, modes_text):
     template_format = mode_to_val['template-format']
     flag_template_format_multiline = False
     flag_template_format_multiline_doc = False
-    if template_format == 'multiline':
+    if template_format in ('multiline', 'mtl'):
         flag_template_format_multiline = True
-    elif template_format == 'multiline-doc':
+    elif template_format in ('multiline-doc', 'mtld'):
         flag_template_format_multiline_doc = True
     elif template_format:
-        logger.error(f'Invalid template_format={template_format}\nmodes_text={modes_text}')
+        logger.error(
+            f'Invalid template_format={template_format}\n'
+            f'Supported values: multiline, mtl, multiline-doc, mtld\n'
+            f'modes_text={modes_text}'
+        )
         sys.exit(1)
 
     func = wrap_func(
@@ -358,10 +362,6 @@ EOF
         sys.exit(1)
 
     func_path = argv[1]
-
-    # if ':' not in func_path:
-    #     logger.error('<func_path>: should have format like "foo.bar:baz".')
-    #     sys.exit(1)
 
     components = []
     for component in func_path.split(':'):
