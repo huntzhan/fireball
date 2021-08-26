@@ -8,6 +8,7 @@ import bdb
 import sys
 import shlex
 import traceback
+from signal import signal, SIGPIPE, SIG_DFL
 from collections import namedtuple
 
 import fire
@@ -58,10 +59,9 @@ def print_template(arguments, break_limit=79, indent=4):
         else:
             components.append(f'--{key}="{val}"')
 
-    header = 'Parameters:\n'
     one_line = ' '.join(components)
     if len(one_line) <= break_limit:
-        logger.info(header + '\n' + one_line + '\n')
+        sys.stdout.write(one_line + '\n')
 
     else:
         lines = [components[0] + ' ' + components[1] + ' \\']
@@ -69,7 +69,7 @@ def print_template(arguments, break_limit=79, indent=4):
             prefix = ' ' * indent
             suffix = ' \\' if idx < len(components) - 1 else ''
             lines.append(prefix + component + suffix)
-        logger.info(header + '\n' + '\n'.join(lines) + '\n')
+        sys.stdout.write('\n'.join(lines) + '\n')
 
 
 def print_template_multiline(arguments):
@@ -77,7 +77,7 @@ def print_template_multiline(arguments):
 
 
 def print_template_multiline_doc(arguments):
-    lines = ['multiline doc parameters:', '']
+    lines = []
 
     lines.append(f'{ExecName.exec_name} "$(cat << EOF')
     lines.append('')
@@ -110,7 +110,7 @@ def extract_arguments(func):
 
         value = param.default
         if value is inspect.Parameter.empty:
-            value = '<required>'
+            value = 'REQUIRED'
 
         mock_arguments[param.name] = value
 
@@ -406,6 +406,9 @@ def exec():
         format=os.getenv('LOGGING_FORMAT', '%(message)s'),
         level=os.getenv('LOGGING_LEVEL', 'INFO'),
     )
+
+    # https://stackoverflow.com/questions/14207708/ioerror-errno-32-broken-pipe-when-piping-prog-py-othercmd
+    signal(SIGPIPE, SIG_DFL)
 
     argv = sys.argv
 
