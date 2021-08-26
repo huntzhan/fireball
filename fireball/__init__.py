@@ -30,32 +30,29 @@ def pdb_excepthook(type_, value, traceback_):
     pdb.pm()
 
 
-def take_over_excepthook(excepthook):
+def takeover_excepthook(excepthook):
     good = True
 
     if hasattr(sys, 'ps1'):
-        logger.warning(
-            'mode=d: Cannot take-over sys.excepthook '
-            'since we are in iterative mode.',
-        )
+        logger.warning('Cannot take-over sys.excepthook ' 'since we are in iterative mode.',)
         good = False
 
     if not sys.stderr.isatty():
         logger.warning(
-            'mode=d: Cannot take-over sys.excepthook '
+            'Cannot take-over sys.excepthook '
             'since we don\'t have a tty-like device.',
         )
         good = False
 
     if good:
-        logger.debug('mode=d: PDB Hooked.')
+        logger.debug('PDB Hooked.')
         sys.excepthook = excepthook
 
 
-def print_template(arguments_copy, break_limit=79, indent=4):
+def print_template(arguments, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
     components = [ExecName.exec_name, entrypoint]
-    for key, val in arguments_copy.items():
+    for key, val in arguments.items():
         if isinstance(val, bool):
             if val:
                 components.append(f'--{key}')
@@ -76,11 +73,11 @@ def print_template(arguments_copy, break_limit=79, indent=4):
         logger.info(header + '\n' + '\n'.join(lines) + '\n')
 
 
-def print_template_multiline(arguments_copy):
-    print_template(arguments_copy, break_limit=0)
+def print_template_multiline(arguments):
+    print_template(arguments, break_limit=0)
 
 
-def print_template_multiline_doc(arguments_copy):
+def print_template_multiline_doc(arguments):
     lines = ['multiline doc parameters:', '']
 
     lines.append(f'{ExecName.exec_name} "$(cat << EOF')
@@ -92,7 +89,7 @@ def print_template_multiline_doc(arguments_copy):
     lines.append('')
 
     lines.append('# Arguments')
-    for key, val in arguments_copy.items():
+    for key, val in arguments.items():
         if isinstance(val, bool):
             if val:
                 lines.append(f'--{key}')
@@ -106,19 +103,19 @@ def print_template_multiline_doc(arguments_copy):
     logger.info('\n'.join(lines))
 
 
-def mock_arguments(func):
+def extract_arguments(func):
     sig = inspect.signature(func)
 
-    mock_arguments_copy = {}
+    mock_arguments = {}
     for param in sig.parameters.values():
 
         value = param.default
         if value is inspect.Parameter.empty:
             value = '<required>'
 
-        mock_arguments_copy[param.name] = value
+        mock_arguments[param.name] = value
 
-    return mock_arguments_copy
+    return mock_arguments
 
 
 def wrap_func(
@@ -136,18 +133,18 @@ def wrap_func(
         bound_args = sig.bind(*args, **kwargs)
         bound_args.apply_defaults()
 
-        arguments_copy = bound_args.arguments.copy()
+        arguments = bound_args.arguments.copy()
 
         if flag_print_template:
             if flag_template_format_multiline_doc:
-                print_template_multiline_doc(arguments_copy)
+                print_template_multiline_doc(arguments)
             elif flag_template_format_multiline:
-                print_template_multiline(arguments_copy)
+                print_template_multiline(arguments)
             else:
-                print_template(arguments_copy)
+                print_template(arguments)
 
         if flag_hook_debugger:
-            take_over_excepthook(pdb_excepthook)
+            takeover_excepthook(pdb_excepthook)
 
         profiler = None
         if flag_hook_profiler:
@@ -190,36 +187,46 @@ def parse_modes_text(modes_text):
     for component in components:
         component = component.strip()
         if '=' in component:
+            # Pattern "key=val".
             try:
                 mode, val = component.split('=')
             except Exception:
-                logger.error(f'Fail to split component={component} into mode and value.')
+                logger.error(
+                    f'Fail to split component={component} into mode and value.\n'
+                    f'modes_text={modes_text}'
+                )
                 sys.exit(1)
         else:
+            # Pattern "a,b,c".
             mode = component
             val = None
 
         if mode in mode_name_to_desc:
+            # Find the name first.
             mode_desc = mode_name_to_desc[mode]
         elif mode in mode_name_abbr_to_desc:
+            # Then the name_attr.
             mode_desc = mode_name_abbr_to_desc[mode]
         else:
-            logger.error(f'Invalid mode={mode}')
+            logger.error(f'Invalid mode={mode}\nmodes_text={modes_text}')
             sys.exit(1)
 
         if mode_desc.type is not bool:
+            # The only supported for now is str.
             if val is None:
-                logger.error(f'Missing value for mode={mode}')
+                logger.error(f'Missing value for mode={mode}\nmodes_text={modes_text}')
                 sys.exit(1)
             try:
                 val = mode_desc.type(val)
             except Exception:
                 logger.error(
                     f'Failed to convert val={val} to {mode_desc.type} '
-                    f'as instructed in mode_desc={mode_desc}.'
+                    f'as instructed in mode_desc={mode_desc}.\n'
+                    f'modes_text={modes_text}'
                 )
                 sys.exit(1)
         else:
+            # bool.
             if val:
                 val = bool(val)
             else:
@@ -246,7 +253,7 @@ def cli(func, modes_text):
     elif template_format == 'multiline-doc':
         flag_template_format_multiline_doc = True
     elif template_format:
-        logger.error(f'Invalid template_format={template_format}')
+        logger.error(f'Invalid template_format={template_format}\nmodes_text={modes_text}')
         sys.exit(1)
 
     func = wrap_func(
@@ -260,11 +267,11 @@ def cli(func, modes_text):
 
     if mode_to_val['print-only-template']:
         if flag_template_format_multiline_doc:
-            return lambda: print_template_multiline_doc(mock_arguments(func))
+            return lambda: print_template_multiline_doc(extract_arguments(func))
         elif flag_template_format_multiline:
-            return lambda: print_template_multiline(mock_arguments(func))
+            return lambda: print_template_multiline(extract_arguments(func))
         else:
-            return lambda: print_template(mock_arguments(func))
+            return lambda: print_template(extract_arguments(func))
 
     return lambda: fire.Fire(func)
 
