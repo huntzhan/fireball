@@ -17,7 +17,7 @@ from pyinstrument import Profiler
 logger = logging.getLogger(__name__)
 
 
-class ExecName:
+class Globals:
     exec_name = None
 
 
@@ -51,7 +51,7 @@ def takeover_excepthook(excepthook):
 
 def print_template(arguments, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
-    components = [ExecName.exec_name, entrypoint]
+    components = [Globals.exec_name, entrypoint]
     for key, val in arguments.items():
         if isinstance(val, bool):
             if val:
@@ -79,7 +79,7 @@ def print_template_multiline(arguments):
 def print_template_multiline_doc(arguments):
     lines = []
 
-    lines.append(f'{ExecName.exec_name} "$(cat << EOF')
+    lines.append(f'{Globals.exec_name} "$(cat << EOF')
     lines.append('')
 
     lines.append('# Entrypoint')
@@ -344,7 +344,7 @@ def exec_argv(argv):
     # |        |                               ^ argv[2:]
     # |        ^ argv[1]
     # ^ argv[0]
-    ExecName.exec_name = get_exec_name(argv)
+    Globals.exec_name = get_exec_name(argv)
 
     modes_msg = []
     for mode_desc in mode_descs:
@@ -354,7 +354,7 @@ def exec_argv(argv):
     help_msg = f'''
 # Default style
 
-{ExecName.exec_name} <module_path>:<func_name>[:<modes>] ...
+{Globals.exec_name} <module_path>:<func_name>[:<modes>] ...
 
 Supported <modes> (comma-seperated):
 
@@ -362,28 +362,28 @@ Supported <modes> (comma-seperated):
 
 Example:
 
-{ExecName.exec_name} os:getcwd
-{ExecName.exec_name} base64:b64encode:pot
-{ExecName.exec_name} base64:b64encode:pot,tf=multiline
-{ExecName.exec_name} foo/bar.py:baz
+{Globals.exec_name} os:getcwd
+{Globals.exec_name} base64:b64encode:pot
+{Globals.exec_name} base64:b64encode:pot,tf=multiline
+{Globals.exec_name} foo/bar.py:baz
 
 
 # Multiline doc style
 
-{ExecName.exec_name} - << EOF
+{Globals.exec_name} - << EOF
 <module_path>:<func_name>[:<modes>]
 ...
 EOF
 
 Example:
 
-{ExecName.exec_name} "$(cat << EOF
+{Globals.exec_name} "$(cat << EOF
 
 # Entrypoint
 base64:b64encode
 
 # Arguments
---s="b'{ExecName.exec_name}'"
+--s="b'{Globals.exec_name}'"
 --altchars="None"
 
 EOF
