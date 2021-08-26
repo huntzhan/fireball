@@ -1,6 +1,5 @@
 import functools
 import importlib
-import importlib.util
 import inspect
 import logging
 import os
@@ -379,14 +378,13 @@ EOF
     try:
         module = importlib.import_module(module_path)
     except ModuleNotFoundError:
-        logger.error('importlib.import_module cannot find or load module %s.', module_path)
-        logger.error(traceback.format_exc())
+        logger.exception(f'importlib.import_module cannot find or load module {module_path}.')
         sys.exit(1)
 
     # Load function.
     func = getattr(module, func_name)
     if func is None:
-        logger.error('Cannot find function %s.', func_name)
+        logger.error(f'Cannot find function {func_name}.')
         sys.exit(1)
 
     # Patch to <module_path>:<func_name> ...
