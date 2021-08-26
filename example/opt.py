@@ -17,3 +17,13 @@ def test_profiler():
 
 def test_exp():
     assert 0
+
+
+def bar():
+    import inspect
+    caller_frame = inspect.currentframe().f_back
+    print(caller_frame.f_globals['__name__'])
+
+
+def foo():
+    bar()

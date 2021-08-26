@@ -284,6 +284,24 @@ def get_exec_name(argv):
     sys.exit(1)
 
 
+def load_module(module_path):
+    try:
+        return importlib.import_module(module_path)
+    except ModuleNotFoundError:
+        logger.error(f'importlib.import_module cannot find or load module {module_path}.')
+        sys.exit(1)
+
+
+def get_callable_attrs_from_module(module):
+    callable_attrs = []
+    for attr in dir(module):
+        obj = getattr(module, attr)
+        if not callable(obj):
+            continue
+        callable_attrs.append(attr)
+    return sorted(callable_attrs)
+
+
 def exec_argv(argv):
     # Input:
     # fireball <module_path>:<func_name>[:...] ...
@@ -341,16 +359,37 @@ EOF
 
     func_path = argv[1]
 
-    if ':' not in func_path:
-        logger.error('<func_path>: should have format like "foo.bar:baz".')
+    # if ':' not in func_path:
+    #     logger.error('<func_path>: should have format like "foo.bar:baz".')
+    #     sys.exit(1)
+
+    components = []
+    for component in func_path.split(':'):
+        component = component.strip()
+        if component:
+            components.append(component)
+
+    if len(components) == 1:
+        logger.error('Missing func_name.')
+        logger.error(help_msg)
+
+        module_path = components[0]
+        logger.error('Loading module...')
+        module = load_module(module_path)
+
+        logger.error('Available func_name under module:\n')
+        for callable_attr in get_callable_attrs_from_module(module):
+            logger.error(f'- {module_path}:{callable_attr}')
+
         sys.exit(1)
 
-    components = func_path.strip().split(':')
-    if len(components) == 2:
+    elif len(components) == 2:
         module_path, func_name = components
         modes_text = None
+
     elif len(components) == 3:
         module_path, func_name, modes_text = components
+
     else:
         logger.error(f'components={components}')
         logger.error(help_msg)
@@ -375,16 +414,12 @@ EOF
         sys.path.append(cwd_path)
 
     # Load module.
-    try:
-        module = importlib.import_module(module_path)
-    except ModuleNotFoundError:
-        logger.exception(f'importlib.import_module cannot find or load module {module_path}.')
-        sys.exit(1)
+    module = load_module(module_path)
 
     # Load function.
-    func = getattr(module, func_name)
+    func = getattr(module, func_name, None)
     if func is None:
-        logger.error(f'Cannot find function {func_name}.')
+        logger.error(f'Cannot find function {func_name} under module.')
         sys.exit(1)
 
     # Patch to <module_path>:<func_name> ...
