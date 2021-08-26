@@ -306,6 +306,36 @@ def get_callable_attrs_from_module(module):
     return sorted(callable_attrs)
 
 
+def get_normalized_edit_distance(text_left, text_right):
+    prev_dis = list(range(len(text_right) + 1))
+    for pos_left, char_left in enumerate(text_left, start=1):
+        curr_dis = [pos_left] * (len(text_right) + 1)
+        for pos_right, char_right in enumerate(text_right, start=1):
+            if char_left == char_right:
+                dis_min = prev_dis[pos_right - 1]
+            else:
+                dis_min = min(
+                    curr_dis[pos_right - 1],
+                    prev_dis[pos_right],
+                    prev_dis[pos_right - 1],
+                )
+                dis_min += 1
+            curr_dis[pos_right] = dis_min
+        prev_dis = curr_dis
+    return prev_dis[-1] / max(len(text_left), len(text_right))
+
+
+def sort_callable_attrs_by_normalized_edit_distance(func_name, callable_attrs):
+    sorted_callable_attrs = []
+    for callable_attr, _ in sorted(
+        [(callable_attr, get_normalized_edit_distance(func_name, callable_attr))
+         for callable_attr in callable_attrs],
+        key=lambda p: p[1],
+    ):
+        sorted_callable_attrs.append(callable_attr)
+    return sorted_callable_attrs
+
+
 def exec_argv(argv):
     # Input:
     # fireball <module_path>:<func_name>[:...] ...
@@ -420,6 +450,14 @@ EOF
     func = getattr(module, func_name, None)
     if func is None:
         logger.error(f'Cannot find function {func_name} under module.')
+        sorted_callable_attrs = sort_callable_attrs_by_normalized_edit_distance(
+            func_name,
+            get_callable_attrs_from_module(module),
+        )
+        logger.error('Suggested top 3 func_name:\n')
+        for callable_attr in sorted_callable_attrs[:3]:
+            logger.error(f'- {module_path}:{callable_attr}')
+
         sys.exit(1)
 
     # Patch to <module_path>:<func_name> ...
