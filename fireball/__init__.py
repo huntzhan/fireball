@@ -296,14 +296,14 @@ def load_module(module_path):
         sys.exit(1)
 
 
-def get_callable_attrs_from_module(module):
-    callable_attrs = []
+def get_func_attrs_from_module(module):
+    func_attrs = []
     for attr in dir(module):
         obj = getattr(module, attr)
-        if not callable(obj):
+        if not inspect.isfunction(obj):
             continue
-        callable_attrs.append(attr)
-    return sorted(callable_attrs)
+        func_attrs.append(attr)
+    return sorted(func_attrs)
 
 
 def get_normalized_edit_distance(text_left, text_right):
@@ -325,15 +325,17 @@ def get_normalized_edit_distance(text_left, text_right):
     return prev_dis[-1] / max(len(text_left), len(text_right))
 
 
-def sort_callable_attrs_by_normalized_edit_distance(func_name, callable_attrs):
-    sorted_callable_attrs = []
-    for callable_attr, _ in sorted(
-        [(callable_attr, get_normalized_edit_distance(func_name, callable_attr))
-         for callable_attr in callable_attrs],
+def sort_func_attrs_by_normalized_edit_distance(func_name, func_attrs):
+    sorted_func_attrs = []
+    func_attr_with_ned = [
+        (func_attr, get_normalized_edit_distance(func_name, func_attr)) for func_attr in func_attrs
+    ]
+    for func_attr, _ in sorted(
+        func_attr_with_ned,
         key=lambda p: p[1],
     ):
-        sorted_callable_attrs.append(callable_attr)
-    return sorted_callable_attrs
+        sorted_func_attrs.append(func_attr)
+    return sorted_func_attrs
 
 
 def exec_argv(argv):
@@ -408,8 +410,8 @@ EOF
         module = load_module(module_path)
 
         logger.error('Available func_name under module:\n')
-        for callable_attr in get_callable_attrs_from_module(module):
-            logger.error(f'- {module_path}:{callable_attr}')
+        for func_attr in get_func_attrs_from_module(module):
+            logger.error(f'- {module_path}:{func_attr}')
 
         sys.exit(1)
 
@@ -450,13 +452,13 @@ EOF
     func = getattr(module, func_name, None)
     if func is None:
         logger.error(f'Cannot find function {func_name} under module.')
-        sorted_callable_attrs = sort_callable_attrs_by_normalized_edit_distance(
+        sorted_func_attrs = sort_func_attrs_by_normalized_edit_distance(
             func_name,
-            get_callable_attrs_from_module(module),
+            get_func_attrs_from_module(module),
         )
         logger.error('Suggested top 3 func_name:\n')
-        for callable_attr in sorted_callable_attrs[:3]:
-            logger.error(f'- {module_path}:{callable_attr}')
+        for func_attr in sorted_func_attrs[:3]:
+            logger.error(f'- {module_path}:{func_attr}')
 
         sys.exit(1)
 
