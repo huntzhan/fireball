@@ -492,3 +492,20 @@ def exec():
         argv = parse_multiline_doc(get_exec_name(argv), argv[1])
 
     exec_argv(argv)
+
+
+def print_export_variable_statements(*args, **kwargs):
+    statements = []
+    for idx, arg in enumerate(args):
+        statements.append(f'export ARGV{idx}="{arg}"')
+    for key, val in kwargs.items():
+        if val is True:
+            statements.append(f'export {key.upper()}="1"')
+        else:
+            statements.append(f'export {key.upper()}="{val}"')
+    sys.stdout.write('\n'.join(statements) + '\n')
+
+
+def exec_print_export_variable_statements():
+    signal(SIGPIPE, SIG_DFL)
+    fire.Fire(print_export_variable_statements)

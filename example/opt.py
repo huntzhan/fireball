@@ -27,3 +27,8 @@ def bar():
 
 def foo():
     bar()
+
+
+def free_opt(*args, **kwargs):
+    print(args)
+    print(kwargs)
