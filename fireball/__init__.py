@@ -293,7 +293,10 @@ def load_module(module_path):
     try:
         return importlib.import_module(module_path)
     except ModuleNotFoundError:
-        logger.exception(f'importlib.import_module cannot find or load module {module_path}.')
+        logger.exception(
+            f'sys.path = {sys.path}\n'
+            f'importlib.import_module cannot find or load module {module_path}'
+        )
         sys.exit(1)
 
 
