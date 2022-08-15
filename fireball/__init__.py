@@ -17,8 +17,8 @@ from pyinstrument import Profiler
 logger = logging.getLogger(__name__)
 
 
-class Globals:
-    exec_name = None
+class Global:
+    exec_name: str = ''
 
 
 def pdb_excepthook(type_, value, traceback_):
@@ -51,7 +51,7 @@ def takeover_excepthook(excepthook):
 
 def print_template(arguments, break_limit=79, indent=4):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
-    components = [Globals.exec_name, entrypoint]
+    components = [Global.exec_name, entrypoint]
     for key, val in arguments.items():
         if isinstance(val, bool):
             if val:
@@ -79,7 +79,7 @@ def print_template_multiline(arguments):
 def print_template_multiline_doc(arguments):
     lines = []
 
-    lines.append(f'{Globals.exec_name} "$(cat << EOF')
+    lines.append(f'{Global.exec_name} "$(cat << EOF')
     lines.append('')
 
     lines.append('# Entrypoint')
@@ -153,6 +153,7 @@ def wrap_func(
         out = func(*bound_args.args, **bound_args.kwargs)
 
         if flag_hook_profiler:
+            assert profiler
             profiler.stop()
             logger.info('profiler.print():')
             profiler.print(show_all=True)
@@ -292,7 +293,7 @@ def load_module(module_path):
     try:
         return importlib.import_module(module_path)
     except ModuleNotFoundError:
-        logger.error(f'importlib.import_module cannot find or load module {module_path}.')
+        logger.exception(f'importlib.import_module cannot find or load module {module_path}.')
         sys.exit(1)
 
 
@@ -344,7 +345,7 @@ def exec_argv(argv):
     # |        |                               ^ argv[2:]
     # |        ^ argv[1]
     # ^ argv[0]
-    Globals.exec_name = get_exec_name(argv)
+    Global.exec_name = get_exec_name(argv)
 
     modes_msg = []
     for mode_desc in mode_descs:
@@ -354,7 +355,7 @@ def exec_argv(argv):
     help_msg = f'''
 # Default style
 
-{Globals.exec_name} <module_path>:<func_name>[:<modes>] ...
+{Global.exec_name} <module_path>:<func_name>[:<modes>] ...
 
 Supported <modes> (comma-seperated):
 
@@ -362,28 +363,28 @@ Supported <modes> (comma-seperated):
 
 Example:
 
-{Globals.exec_name} os:getcwd
-{Globals.exec_name} base64:b64encode:pot
-{Globals.exec_name} base64:b64encode:pot,tf=multiline
-{Globals.exec_name} foo/bar.py:baz
+{Global.exec_name} os:getcwd
+{Global.exec_name} base64:b64encode:pot
+{Global.exec_name} base64:b64encode:pot,tf=multiline
+{Global.exec_name} foo/bar.py:baz
 
 
 # Multiline doc style
 
-{Globals.exec_name} - << EOF
+{Global.exec_name} - << EOF
 <module_path>:<func_name>[:<modes>]
 ...
 EOF
 
 Example:
 
-{Globals.exec_name} "$(cat << EOF
+{Global.exec_name} "$(cat << EOF
 
 # Entrypoint
 base64:b64encode
 
 # Arguments
---s="b'{Globals.exec_name}'"
+--s="b'{Global.exec_name}'"
 --altchars="None"
 
 EOF
