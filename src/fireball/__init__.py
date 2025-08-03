@@ -11,7 +11,7 @@ import traceback
 from signal import signal, SIGPIPE, SIG_DFL
 from collections import namedtuple
 
-import fire
+import typer
 from pyinstrument import Profiler
 
 logger = logging.getLogger(__name__)
@@ -34,14 +34,15 @@ def takeover_excepthook(excepthook):
     good = True
 
     if hasattr(sys, 'ps1'):
-        logger.warning('Cannot take-over sys.excepthook ' 'since we are in iterative mode.',)
+        logger.warning(
+            'Cannot take-over sys.excepthook '
+            'since we are in iterative mode.', )
         good = False
 
     if not sys.stderr.isatty():
         logger.warning(
             'Cannot take-over sys.excepthook '
-            'since we don\'t have a tty-like device.',
-        )
+            'since we don\'t have a tty-like device.', )
         good = False
 
     if good:
@@ -49,7 +50,7 @@ def takeover_excepthook(excepthook):
         sys.excepthook = excepthook
 
 
-def print_template(arguments, break_limit=79, indent=4):
+def print_template(arguments, break_limit=79, indent=0):
     entrypoint = ':'.join(sys.argv[0].strip().split(':')[:2])
     components = [Global.exec_name, entrypoint]
     for key, val in arguments.items():
@@ -103,7 +104,7 @@ def print_template_multiline_doc(arguments):
 
 
 def extract_arguments(func):
-    sig = inspect.signature(func)
+    sig = func.__original_sig__
 
     mock_arguments = {}
     for param in sig.parameters.values():
@@ -124,11 +125,37 @@ def wrap_func(
     flag_template_format_multiline,
     flag_hook_debugger,
     flag_hook_profiler,
+    flag_print_return,
 ):
     sig = inspect.signature(func)
 
+    parameters = list(sig.parameters.values())
+    new_parameters = []
+
+    for param in parameters:
+        # 跳过*args和**kwargs参数
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL,
+                          inspect.Parameter.VAR_KEYWORD):
+            new_parameters.append(param)
+            continue
+
+        # 设置typer.Option默认值
+        if param.default is inspect.Parameter.empty:
+            # 无默认值的参数
+            new_default = typer.Option()
+        else:
+            # 有默认值的参数，包装现有默认值
+            new_default = typer.Option(default=param.default)
+
+        # 创建新参数对象
+        new_param = param.replace(default=new_default)
+        new_parameters.append(new_param)
+
+    # 更新函数签名
+    new_sig = sig.replace(parameters=new_parameters)
+
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper0(*args, **kwargs):
         bound_args = sig.bind(*args, **kwargs)
         bound_args.apply_defaults()
 
@@ -158,22 +185,69 @@ def wrap_func(
             logger.info('profiler.print():')
             profiler.print(show_all=True)
 
+        if flag_print_return:
+            sys.stdout.write(str(out) + '\n')
+
         return out
 
-    return wrapper
+    # 1. 解决 builtin function 无法改 __signature__ 的问题
+    # 2. 不修改原先 func 的 __signature__
+    wrapper0.__signature__ = new_sig
+
+    @functools.wraps(wrapper0)
+    def wrapper1(*args, **kwargs):
+        return wrapper0(*args, **kwargs)
+
+    wrapper1.__original_sig__ = sig
+
+    return wrapper1
 
 
 ModeDesc = namedtuple('Mode', ['name', 'name_abbr', 'type', 'msg'])
 
 mode_descs = [
-    ModeDesc('print-template', 'pt', bool, 'print the template.'),
-    ModeDesc('print-only-template', 'pot', bool, 'print only the template then abort.'),
-    ModeDesc('template-format', 'tf', str, 'force to multiline/multiline-doc format.'),
-    ModeDesc('hook-debugger', 'hd', bool, 'hook debugger (pdb).'),
-    ModeDesc('hook-profiler', 'hp', bool, 'hook profiler (pyinstrument).'),
+    ModeDesc(
+        'print-template',
+        'pt',
+        bool,
+        'print the template.',
+    ),
+    ModeDesc(
+        'print-only-template',
+        'pot',
+        bool,
+        'print only the template then abort.',
+    ),
+    ModeDesc(
+        'template-format',
+        'tf',
+        str,
+        'force to multiline/multiline-doc format.',
+    ),
+    ModeDesc(
+        'hook-debugger',
+        'hd',
+        bool,
+        'hook debugger (pdb).',
+    ),
+    ModeDesc(
+        'hook-profiler',
+        'hp',
+        bool,
+        'hook profiler (pyinstrument).',
+    ),
+    ModeDesc(
+        'print-return',
+        'pr',
+        bool,
+        'print the return value of function.',
+    ),
 ]
 mode_name_to_desc = {mode_desc.name: mode_desc for mode_desc in mode_descs}
-mode_name_abbr_to_desc = {mode_desc.name_abbr: mode_desc for mode_desc in mode_descs}
+mode_name_abbr_to_desc = {
+    mode_desc.name_abbr: mode_desc
+    for mode_desc in mode_descs
+}
 
 
 def parse_modes_text(modes_text):
@@ -193,8 +267,7 @@ def parse_modes_text(modes_text):
             except Exception:
                 logger.error(
                     f'Fail to split component={component} into mode and value.\n'
-                    f'modes_text={modes_text}'
-                )
+                    f'modes_text={modes_text}')
                 sys.exit(1)
         else:
             # Pattern "a,b,c".
@@ -214,7 +287,8 @@ def parse_modes_text(modes_text):
         if mode_desc.type is not bool:
             # The only supported for now is str.
             if val is None:
-                logger.error(f'Missing value for mode={mode}\nmodes_text={modes_text}')
+                logger.error(
+                    f'Missing value for mode={mode}\nmodes_text={modes_text}')
                 sys.exit(1)
             try:
                 val = mode_desc.type(val)
@@ -222,8 +296,7 @@ def parse_modes_text(modes_text):
                 logger.error(
                     f'Failed to convert val={val} to {mode_desc.type} '
                     f'as instructed in mode_desc={mode_desc}.\n'
-                    f'modes_text={modes_text}'
-                )
+                    f'modes_text={modes_text}')
                 sys.exit(1)
         else:
             # bool.
@@ -253,11 +326,9 @@ def cli(func, modes_text):
     elif template_format in ('multiline-doc', 'mtld'):
         flag_template_format_multiline_doc = True
     elif template_format:
-        logger.error(
-            f'Invalid template_format={template_format}\n'
-            f'Supported values: multiline, mtl, multiline-doc, mtld\n'
-            f'modes_text={modes_text}'
-        )
+        logger.error(f'Invalid template_format={template_format}\n'
+                     f'Supported values: multiline, mtl, multiline-doc, mtld\n'
+                     f'modes_text={modes_text}')
         sys.exit(1)
 
     func = wrap_func(
@@ -267,17 +338,19 @@ def cli(func, modes_text):
         flag_template_format_multiline=flag_template_format_multiline,
         flag_hook_debugger=mode_to_val['hook-debugger'],
         flag_hook_profiler=mode_to_val['hook-profiler'],
+        flag_print_return=mode_to_val['print-return'],
     )
 
     if mode_to_val['print-only-template']:
         if flag_template_format_multiline_doc:
-            return lambda: print_template_multiline_doc(extract_arguments(func))
+            return lambda: print_template_multiline_doc(extract_arguments(func)
+                                                        )
         elif flag_template_format_multiline:
             return lambda: print_template_multiline(extract_arguments(func))
         else:
             return lambda: print_template(extract_arguments(func))
 
-    return lambda: fire.Fire(func)
+    return lambda: typer.run(func)
 
 
 def get_exec_name(argv):
@@ -331,12 +404,12 @@ def get_normalized_edit_distance(text_left, text_right):
 
 def sort_func_attrs_by_normalized_edit_distance(func_name, func_attrs):
     sorted_func_attrs = []
-    func_attr_with_ned = [
-        (func_attr, get_normalized_edit_distance(func_name, func_attr)) for func_attr in func_attrs
-    ]
+    func_attr_with_ned = [(func_attr,
+                           get_normalized_edit_distance(func_name, func_attr))
+                          for func_attr in func_attrs]
     for func_attr, _ in sorted(
-        func_attr_with_ned,
-        key=lambda p: p[1],
+            func_attr_with_ned,
+            key=lambda p: p[1],
     ):
         sorted_func_attrs.append(func_attr)
     return sorted_func_attrs
@@ -352,7 +425,8 @@ def exec_argv(argv):
 
     modes_msg = []
     for mode_desc in mode_descs:
-        modes_msg.append(f'- {mode_desc.name}, {mode_desc.name_abbr}: {mode_desc.msg}')
+        modes_msg.append(
+            f'- {mode_desc.name}, {mode_desc.name_abbr}: {mode_desc.msg}')
     modes_msg = '\n'.join(modes_msg)
 
     help_msg = f'''
@@ -512,4 +586,4 @@ def print_export_variable_statements(*args, **kwargs):
 
 def exec_print_export_variable_statements():
     signal(SIGPIPE, SIG_DFL)
-    fire.Fire(print_export_variable_statements)
+    typer.run(print_export_variable_statements)

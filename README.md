@@ -1,6 +1,6 @@
 # fireball
 
-Built on [python-fire](https://github.com/google/python-fire) to make binding & debugging easier.
+Built on [typer](https://github.com/fastapi/typer) to make binding & debugging easier.
 
 ## Install
 
